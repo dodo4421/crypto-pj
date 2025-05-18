@@ -7,67 +7,69 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>SecureBoard - 암호화 게시판 시스템</title>
-        <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+        <title>
+          SecureBoard - 암호화 게시판 시스템dㄴㅇㄻㄴㅇㄻㄴㅇㄻㄹㄹdd
+        </title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
 
-      <div className='container'>
+      <div className="container">
         <header>
-          <div className='logo'>SecureBoard</div>
+          <div className="logo">SecureBoard</div>
           <nav>
             <ul>
               <li>
-                <a href='#' className='active'>
+                <a href="#" className="active">
                   홈
                 </a>
               </li>
               <li>
-                <a href='#'>작성</a>
+                <a href="#">작성</a>
               </li>
               <li>
-                <a href='#'>프로필</a>
+                <a href="#">프로필</a>
               </li>
               <li>
-                <a href='#'>로그인</a>
+                <a href="#">로그인</a>
               </li>
             </ul>
           </nav>
         </header>
 
-        <div className='search-container'>
+        <div className="search-container">
           <input
-            type='text'
-            className='search-box'
-            placeholder='게시글 검색...'
+            type="text"
+            className="search-box"
+            placeholder="게시글 검색..."
           />
-          <button className='search-btn'>검색</button>
+          <button className="search-btn">검색</button>
         </div>
 
-        <div className='post-list'>
+        <div className="post-list">
           {/* 게시글 카드 반복 */}
-          <div className='post-card'>
-            <div className='post-title'>보안 강화된 게시판 시스템의 필요성</div>
-            <div className='post-info'>
+          <div className="post-card">
+            <div className="post-title">보안 강화된 게시판 시스템의 필요성</div>
+            <div className="post-info">
               <span>작성자: 관리자</span>
               <span>2025.05.18</span>
             </div>
-            <div className='post-excerpt'>
+            <div className="post-excerpt">
               오늘날 인터넷 환경에서 정보 보안은 매우 중요한 요소입니다...
             </div>
-            <div className='encryption-tag'>AES-256</div>
+            <div className="encryption-tag">AES-256</div>
           </div>
           {/* 추가 카드 생략 */}
         </div>
 
-        <div className='pagination'>
+        <div className="pagination">
           <button>이전</button>
-          <button className='active'>1</button>
+          <button className="active">1</button>
           <button>2</button>
           <button>3</button>
           <button>다음</button>
         </div>
 
-        <div className='create-post' title='게시글 작성'>
+        <div className="create-post" title="게시글 작성">
           +
         </div>
 
