@@ -26,6 +26,9 @@ export default function LoginPage() {
         return
       }
 
+      // ✅ 여기가 핵심! 토큰 저장
+      localStorage.setItem('accessToken', data.token)
+
       // ✅ 로그인 성공 시 /test로 이동
       router.push('/test')
     } catch (err) {
