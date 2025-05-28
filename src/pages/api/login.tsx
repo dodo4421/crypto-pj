@@ -25,7 +25,6 @@ export default async function handler(
     return res.status(401).json({ message: '이메일 또는 비밀번호가 틀립니다.' })
 
   const privateKey = fs.readFileSync(path.resolve('private.pem'), 'utf8')
-
   const accessToken = jwt.sign(
     {
       email: user.email,
@@ -34,7 +33,7 @@ export default async function handler(
     privateKey,
     {
       algorithm: 'RS256',
-      expiresIn: '30s',
+      expiresIn: '3000s',
     }
   )
 

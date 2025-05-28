@@ -1,0 +1,250 @@
+/* chat.module.css */
+.chatContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: #f8f8f8;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.chatHeader {
+  display: flex;
+  align-items: center;
+  padding: 15px 20px;
+  background-color: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.backButton {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #333;
+  cursor: pointer;
+  margin-right: 15px;
+  padding: 5px 10px;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.backButton:hover {
+  background-color: #f0f0f0;
+}
+
+.recipientInfo {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.recipientAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #4f70be;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin-right: 10px;
+}
+
+.recipientDetails {
+  display: flex;
+  flex-direction: column;
+}
+
+.recipientDetails h2 {
+  font-size: 16px;
+  margin: 0;
+  color: #333;
+}
+
+.recipientDetails p {
+  font-size: 13px;
+  color: #777;
+  margin: 2px 0 0 0;
+}
+
+.typingIndicator {
+  font-size: 12px;
+  color: #4f70be;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.recipientLoading {
+  flex: 1;
+  color: #999;
+  font-style: italic;
+}
+
+.recipientError {
+  flex: 1;
+  color: #d93025;
+}
+
+.chatOptions {
+  margin-left: 10px;
+}
+
+.encryptionSelect {
+  padding: 5px 8px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  font-size: 12px;
+  background-color: #f8f8f8;
+}
+
+.messagesContainer {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.messageItem {
+  max-width: 70%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  position: relative;
+}
+
+.myMessage {
+  align-self: flex-end;
+  background-color: #dcf8c6;
+}
+
+.theirMessage {
+  align-self: flex-start;
+  background-color: #fff;
+}
+
+.messageContent {
+  font-size: 15px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.messageFooter {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+  gap: 4px;
+}
+
+.messageTime {
+  margin-right: 2px;
+}
+
+.readStatus {
+  font-size: 11px;
+}
+
+.encryptionTag {
+  font-size: 10px;
+}
+
+.loading, .error, .emptyChat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  text-align: center;
+  padding: 20px;
+}
+
+.spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #4f70be;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error {
+  color: #d93025;
+}
+
+.retryButton {
+  margin-top: 10px;
+  padding: 8px 16px;
+  background-color: #4f70be;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.retryButton:hover {
+  background-color: #3a5ba0;
+}
+
+.messageInputForm {
+  display: flex;
+  padding: 15px;
+  background-color: #fff;
+  border-top: 1px solid #e0e0e0;
+  position: sticky;
+  bottom: 0;
+}
+
+.messageInput {
+  flex: 1;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  padding: 10px 15px;
+  font-size: 15px;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.messageInput:focus {
+  border-color: #4f70be;
+}
+
+.sendButton {
+  margin-left: 10px;
+  background-color: #4f70be;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 0 20px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.sendButton:hover {
+  background-color: #3a5ba0;
+}
+
+.sendButton:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
