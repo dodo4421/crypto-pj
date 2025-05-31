@@ -34,7 +34,7 @@ export default async function handler(
     privateKey,
     {
       algorithm: 'RS256',
-      expiresIn: '30s',
+      expiresIn: '1h',
     }
   )
 
