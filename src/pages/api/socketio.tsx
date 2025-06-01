@@ -83,6 +83,7 @@ export default async function handler(
         credentials: true,
       },
       addTrailingSlash: false,
+      pingTimeout: 60000, // 핑 타임아웃 증가
     })
 
     // 서버 인스턴스에 Socket.io 할당
@@ -90,27 +91,34 @@ export default async function handler(
 
     // 사용자 조회 함수 개선
     const findUser = async (userId: string) => {
-      // 방법 1: 직접 ID로 검색
-      if (isValidObjectId(userId)) {
-        const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+      if (!userId) return null;
+      
+      try {
+        // 방법 1: 직접 ID로 검색
+        if (isValidObjectId(userId)) {
+          const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+          if (user) return user;
+        }
+        
+        // 방법 2: nickname으로 검색
+        const user = await usersCollection.findOne({ nickname: userId });
         if (user) return user;
+        
+        // 방법 3: nickname = _id 문자열로 검색
+        if (isValidObjectId(userId)) {
+          const user = await usersCollection.findOne({ nickname: userId.toString() });
+          if (user) return user;
+        }
+        
+        // 방법 4: 이메일 검색
+        const userByEmail = await usersCollection.findOne({ email: userId });
+        if (userByEmail) return userByEmail;
+        
+        return null;
+      } catch (error) {
+        console.error(`Error finding user ${userId}:`, error);
+        return null;
       }
-      
-      // 방법 2: nickname으로 검색
-      const user = await usersCollection.findOne({ nickname: userId });
-      if (user) return user;
-      
-      // 방법 3: nickname = _id 문자열로 검색
-      if (isValidObjectId(userId)) {
-        const user = await usersCollection.findOne({ nickname: userId.toString() });
-        if (user) return user;
-      }
-      
-      // 방법 4: 이메일 검색
-      const userByEmail = await usersCollection.findOne({ email: userId });
-      if (userByEmail) return userByEmail;
-      
-      return null;
     };
 
     // 연결 이벤트 처리
@@ -119,185 +127,187 @@ export default async function handler(
 
       // 인증 처리
       socket.on('authenticate', async (token) => {
-        const decoded = verifyToken(token)
-        if (!decoded) {
-          console.log('Invalid token')
-          socket.emit('auth_error', { message: '인증에 실패했습니다.' })
-          socket.disconnect(true)
-          return
-        }
-
-        const userId = decoded.userId || decoded.sub || decoded.id
-        const email = decoded.email
-
-        if (!userId) {
-          console.log('Token missing userId, id, or sub')
-          socket.emit('auth_error', { message: '유효하지 않은 사용자 정보입니다.' })
-          socket.disconnect(true)
-          return
-        }
-
-        // 사용자 정보 확인
-        const user = await findUser(userId)
-        if (!user) {
-          console.log(`User not found: ${userId}`)
-          socket.emit('auth_error', { message: '등록되지 않은 사용자입니다.' })
-          socket.disconnect(true)
-          return
-        }
-
-        // 소켓에 사용자 정보 저장
-        socket.data.userId = user._id.toString()
-        socket.data.nickname = user.nickname || user._id.toString()
-        socket.data.email = user.email || email
-
-        console.log(`User authenticated: ${socket.data.email} (${socket.data.userId})`)
-
-        // 연결된 사용자 목록에 추가
-        connectedUsers.set(socket.data.userId, socket.id)
-        
-        // 닉네임이 있으면 닉네임으로도 연결 정보 추가
-        if (user.nickname && user.nickname !== user._id.toString()) {
-          connectedUsers.set(user.nickname, socket.id)
-        }
-
-        // 사용자 온라인 상태 업데이트
-        await usersCollection.updateOne(
-          { _id: user._id },
-          { $set: { online: true, lastActive: new Date() } }
-        )
-
-        // 사용자 온라인 상태 브로드캐스트
-        socket.broadcast.emit('user_status', {
-          userId: socket.data.userId,
-          status: 'online'
-        })
-
-        // 사용자 대화 목록을 조회하여 전송
         try {
-          // 사용자의 모든 대화방 조회
-          const conversations = await conversationsCollection
-            .find({ 
-              participants: { 
-                $in: [
-                  socket.data.userId, 
-                  socket.data.nickname
-                ]
-              } 
-            })
-            .sort({ updatedAt: -1 })
-            .toArray();
+          const decoded = verifyToken(token)
+          if (!decoded) {
+            console.log('Invalid token')
+            socket.emit('auth_error', { message: '인증에 실패했습니다.' })
+            return // 소켓을 즉시 끊지 말고 오류만 전송
+          }
+
+          const userId = decoded.userId || decoded.sub || decoded.id
+          const email = decoded.email
+
+          if (!userId) {
+            console.log('Token missing userId, id, or sub')
+            socket.emit('auth_error', { message: '유효하지 않은 사용자 정보입니다.' })
+            return
+          }
+
+          // 사용자 정보 확인
+          const user = await findUser(userId)
+          if (!user) {
+            console.log(`User not found: ${userId}`)
+            socket.emit('auth_error', { message: '등록되지 않은 사용자입니다.' })
+            return
+          }
+
+          // 소켓에 사용자 정보 저장
+          socket.data.userId = user._id.toString()
+          socket.data.nickname = user.nickname || user._id.toString()
+          socket.data.email = user.email || email
+
+          console.log(`User authenticated: ${socket.data.email} (${socket.data.userId})`)
+          socket.emit('auth_success', { userId: socket.data.userId }) // 인증 성공 이벤트 추가
+
+          // 연결된 사용자 목록에 추가
+          connectedUsers.set(socket.data.userId, socket.id)
           
-          // unreadCount 계산
-          const enhancedConversations = await Promise.all(
-            conversations.map(async (conv) => {
-              const otherParticipantId = conv.participants.find(
-                (id: string) => id !== socket.data.userId && id !== socket.data.nickname
-              );
-              
-              const otherParticipant = await findUser(otherParticipantId);
-              
-              // unreadCount 계산
-              const unreadCount = conv.unreadCounts 
-                ? (conv.unreadCounts.find((uc: { user: string, count: number }) => 
-                    uc.user === socket.data.userId || uc.user === socket.data.nickname
-                  )?.count || 0)
-                : 0;
+          // 닉네임이 있으면 닉네임으로도 연결 정보 추가
+          if (user.nickname && user.nickname !== user._id.toString()) {
+            connectedUsers.set(user.nickname, socket.id)
+          }
+
+          // 사용자 온라인 상태 업데이트
+          await usersCollection.updateOne(
+            { _id: user._id },
+            { $set: { online: true, lastActive: new Date() } }
+          )
+
+          // 사용자 온라인 상태 브로드캐스트
+          socket.broadcast.emit('user_status', {
+            userId: socket.data.userId,
+            status: 'online'
+          })
+
+          // 사용자 대화 목록을 조회하여 전송
+          try {
+            // 사용자의 모든 대화방 조회
+            const conversations = await conversationsCollection
+              .find({ 
+                participants: { 
+                  $in: [
+                    socket.data.userId, 
+                    socket.data.nickname
+                  ]
+                } 
+              })
+              .sort({ updatedAt: -1 })
+              .toArray();
+            
+            // unreadCount 계산
+            const enhancedConversations = await Promise.all(
+              conversations.map(async (conv) => {
+                const otherParticipantId = conv.participants.find(
+                  (id: string) => id !== socket.data.userId && id !== socket.data.nickname
+                );
                 
-              return {
-                id: conv.roomId,
-                participant: {
-                  id: otherParticipantId,
-                  email: otherParticipant?.email || 'Unknown',
-                  nickname: otherParticipant?.nickname || otherParticipantId
-                },
-                lastMessage: conv.lastMessage,
-                unreadCount,
-                updatedAt: conv.updatedAt
-              };
-            })
-          );
-          
-          console.log(`Sending ${enhancedConversations.length} conversations to user ${socket.data.userId}`);
-          socket.emit('conversations_list', enhancedConversations);
+                const otherParticipant = await findUser(otherParticipantId);
+                
+                // unreadCount 계산
+                const unreadCount = conv.unreadCounts 
+                  ? (conv.unreadCounts.find((uc: { user: string, count: number }) => 
+                      uc.user === socket.data.userId || uc.user === socket.data.nickname
+                    )?.count || 0)
+                  : 0;
+                  
+                return {
+                  id: conv.roomId,
+                  participant: {
+                    id: otherParticipantId,
+                    email: otherParticipant?.email || 'Unknown',
+                    nickname: otherParticipant?.nickname || otherParticipantId
+                  },
+                  lastMessage: conv.lastMessage,
+                  unreadCount,
+                  updatedAt: conv.updatedAt
+                };
+              })
+            );
+            
+            console.log(`Sending ${enhancedConversations.length} conversations to user ${socket.data.userId}`);
+            socket.emit('conversations_list', enhancedConversations);
+          } catch (error) {
+            console.error('Error fetching conversations:', error);
+            socket.emit('error', { message: '대화 목록을 불러오는 데 실패했습니다.' });
+          }
         } catch (error) {
-          console.error('Error fetching conversations:', error);
-          socket.emit('error', { message: '대화 목록을 불러오는 데 실패했습니다.' });
+          console.error('Authentication error:', error);
+          socket.emit('auth_error', { message: '인증 처리 중 오류가 발생했습니다.' });
         }
       });
 
       // 사용자 목록 요청 이벤트 핸들러
-socket.on('get_users', async () => {
-  const userId = socket.data.userId;
-  const userNickname = socket.data.nickname;
-  
-  if (!userId) {
-    console.log('User not authenticated when requesting users list');
-    socket.emit('error', { message: '인증되지 않은 사용자입니다.' });
-    return;
-  }
-  
-  try {
-    // 쿼리 구성
-    let query = {};
-    
-    // 현재 사용자를 제외하는 쿼리 구성 (ID와 nickname 모두 체크)
-    if (isValidObjectId(userId)) {
-      // ObjectId가 유효한 경우
-      query = {
-        $and: [
-          { 
-            $or: [
-              { _id: { $ne: new ObjectId(userId) } },
-              { nickname: { $ne: userNickname } }
-            ]
-          },
-          {
-            $or: [
-              { _id: { $exists: true } },
-              { email: { $exists: true } }
-            ]
+      socket.on('get_users', async () => {
+        const userId = socket.data.userId;
+        const userNickname = socket.data.nickname;
+        
+        if (!userId) {
+          console.log('User not authenticated when requesting users list');
+          socket.emit('error', { message: '인증되지 않은 사용자입니다.' });
+          return;
+        }
+        
+        try {
+          // 쿼리 구성
+          let query = {};
+          
+          // 현재 사용자를 제외하는 쿼리 구성 (ID와 nickname 모두 체크)
+          if (isValidObjectId(userId)) {
+            // ObjectId가 유효한 경우
+            query = {
+              $and: [
+                { 
+                  $or: [
+                    { _id: { $ne: new ObjectId(userId) } },
+                    { nickname: { $ne: userNickname } }
+                  ]
+                },
+                {
+                  $or: [
+                    { _id: { $exists: true } },
+                    { email: { $exists: true } }
+                  ]
+                }
+              ]
+            };
+          } else {
+            // ObjectId가 유효하지 않은 경우
+            query = {
+              $and: [
+                { nickname: { $ne: userNickname } },
+                {
+                  $or: [
+                    { _id: { $exists: true } },
+                    { email: { $exists: true } }
+                  ]
+                }
+              ]
+            };
           }
-        ]
-      };
-    } else {
-      // ObjectId가 유효하지 않은 경우
-      query = {
-        $and: [
-          { nickname: { $ne: userNickname } },
-          {
-            $or: [
-              { _id: { $exists: true } },
-              { email: { $exists: true } }
-            ]
-          }
-        ]
-      };
-    }
-    
-    // 현재 사용자를 제외한 모든 사용자 조회
-    const users = await usersCollection
-      .find(query)
-      .project({ password: 0 })
-      .toArray();
-      
-    console.log(`Found ${users.length} users for user ${userId}`);
-    
-    // 사용자 정보 포맷팅
-    const formattedUsers = users.map(user => ({
-      id: user._id.toString(),
-      email: user.email || '',
-      nickname: user.nickname || user._id.toString()
-    }));
-    
-    console.log(`Sending ${formattedUsers.length} users to user ${userId}`);
-    socket.emit('users_list', formattedUsers);
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    socket.emit('error', { message: '사용자 목록을 불러오는 데 실패했습니다.' });
-  }
-});
-
+          
+          // 현재 사용자를 제외한 모든 사용자 조회
+          const users = await usersCollection
+            .find(query)
+            .project({ password: 0 })
+            .toArray();
+            
+          console.log(`Found ${users.length} users for user ${userId}`);
+          
+          // 사용자 정보 포맷팅
+          const formattedUsers = users.map(user => ({
+            id: user._id.toString(),
+            email: user.email || '',
+            nickname: user.nickname || user._id.toString()
+          }));
+          
+          console.log(`Sending ${formattedUsers.length} users to user ${userId}`);
+          socket.emit('users_list', formattedUsers);
+        } catch (error) {
+          console.error('Error fetching users:', error);
+          socket.emit('error', { message: '사용자 목록을 불러오는 데 실패했습니다.' });
+        }
+      });
 
       // 대화 목록 요청 이벤트 핸들러
       socket.on('get_conversations', async () => {
@@ -305,6 +315,7 @@ socket.on('get_users', async () => {
         const userNickname = socket.data.nickname;
         
         if (!userId) {
+          console.log('User not authenticated when requesting conversations');
           socket.emit('error', { message: '인증되지 않은 사용자입니다.' });
           return;
         }
@@ -363,6 +374,7 @@ socket.on('get_users', async () => {
         const userNickname = socket.data.nickname;
         
         if (!userId) {
+          console.log('User not authenticated when joining room');
           socket.emit('error', { message: '인증되지 않은 사용자입니다.' });
           return;
         }
@@ -434,10 +446,16 @@ socket.on('get_users', async () => {
             .sort({ createdAt: 1 })
             .toArray();
 
+          // ID 필드 일관성 보장
+          const formattedMessages = messages.map(msg => ({
+            ...msg,
+            id: msg.id || msg._id.toString() // id 필드 보장
+          }));
+
           // 상대방 정보와 함께 대화 기록 전송
           socket.emit('chat_history', {
             roomId,
-            messages,
+            messages: formattedMessages,
             recipientInfo: {
               id: recipientIdStr,
               email: recipient.email || '',
@@ -446,7 +464,7 @@ socket.on('get_users', async () => {
           });
 
           // 읽지 않은 메시지를 읽음으로 표시
-          await messagesCollection.updateMany(
+          const unreadMessages = await messagesCollection.updateMany(
             {
               roomId,
               receiver: userId,
@@ -455,13 +473,42 @@ socket.on('get_users', async () => {
             { $set: { isRead: true } }
           );
 
-          // 상대방에게 메시지 읽음 알림
-          const recipientSocketId = connectedUsers.get(recipientIdStr) || connectedUsers.get(recipientNickname);
-          if (recipientSocketId) {
-            io.to(recipientSocketId).emit('messages_read', {
-              roomId,
-              reader: userId
-            });
+          // 업데이트된 메시지가 있으면 상대방에게 읽음 표시 알림
+          if (unreadMessages.modifiedCount > 0) {
+            // 읽은 메시지 ID 조회
+            const readMessages = await messagesCollection
+              .find({
+                roomId,
+                receiver: userId,
+                isRead: true
+              })
+              .project({ _id: 1 })
+              .toArray();
+            
+            const readMessageIds = readMessages.map(msg => msg._id.toString());
+            
+            // 상대방에게 메시지 읽음 알림
+            const recipientSocketId = connectedUsers.get(recipientIdStr) || connectedUsers.get(recipientNickname);
+            if (recipientSocketId) {
+              io.to(recipientSocketId).emit('messages_read', {
+                roomId,
+                messageIds: readMessageIds,
+                reader: userId
+              });
+            }
+            
+            // 읽지 않은 메시지 카운트 업데이트
+            await conversationsCollection.updateOne(
+              { roomId },
+              { 
+                $set: {
+                  "unreadCounts.$[elem].count": 0
+                }
+              },
+              {
+                arrayFilters: [{ "elem.user": userId }]
+              }
+            );
           }
         } catch (error) {
           console.error('Error joining room:', error);
@@ -510,10 +557,11 @@ socket.on('get_users', async () => {
 
           // 메시지 DB 저장
           const result = await messagesCollection.insertOne(newMessage);
+          const messageId = result.insertedId.toString();
           const message = { 
             ...newMessage, 
             _id: result.insertedId,
-            id: result.insertedId.toString() // 클라이언트가 id 필드를 사용하는 경우 대비
+            id: messageId // 항상 문자열 ID 제공
           };
 
           // 대화 정보 업데이트 (또는 생성)
@@ -550,7 +598,7 @@ socket.on('get_users', async () => {
             io.to(recipientSocketId).emit('message_notification', {
               roomId,
               message: {
-                id: message.id || message._id.toString(),
+                id: messageId,
                 sender: userId,
                 senderEmail: userEmail,
                 senderNickname: userNickname,
@@ -588,6 +636,8 @@ socket.on('get_users', async () => {
                 isTyping
               });
             }
+          }).catch(err => {
+            console.error('Error in typing event (findUser):', err);
           });
         } catch (error) {
           console.error('Error in typing event:', error);
@@ -597,7 +647,7 @@ socket.on('get_users', async () => {
       // 메시지 읽음 표시
       socket.on('mark_read', async ({ roomId, messageIds }) => {
         const userId = socket.data.userId;
-        if (!userId || !roomId) return;
+        if (!userId || !roomId || !messageIds || messageIds.length === 0) return;
 
         try {
           // 메시지 ID가 ObjectId 형태인지 확인하고 변환
@@ -630,6 +680,19 @@ socket.on('get_users', async () => {
             messageIds,
             reader: userId
           });
+          
+          // 대화 목록의 읽지 않은 메시지 카운트 업데이트
+          await conversationsCollection.updateOne(
+            { roomId },
+            { 
+              $set: {
+                "unreadCounts.$[elem].count": 0
+              }
+            },
+            {
+              arrayFilters: [{ "elem.user": userId }]
+            }
+          );
         } catch (error) {
           console.error('Error marking messages as read:', error);
         }
@@ -650,10 +713,17 @@ socket.on('get_users', async () => {
 
         try {
           // 사용자 상태 업데이트
-          await usersCollection.updateOne(
-            { _id: isValidObjectId(userId) ? new ObjectId(userId) : { $eq: userId } },
-            { $set: { online: false, lastActive: new Date() } }
-          );
+          if (isValidObjectId(userId)) {
+            await usersCollection.updateOne(
+              { _id: new ObjectId(userId) },
+              { $set: { online: false, lastActive: new Date() } }
+            );
+          } else {
+            await usersCollection.updateOne(
+              { $or: [{ nickname: userId }, { email: userId }] },
+              { $set: { online: false, lastActive: new Date() } }
+            );
+          }
           
           // 사용자 오프라인 상태 브로드캐스트
           socket.broadcast.emit('user_status', {
