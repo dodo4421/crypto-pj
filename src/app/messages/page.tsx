@@ -2,14 +2,13 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import styles from '../check/check.module.css'
+import styles from '../messages/messages.module.css'
 
 // MongoDB에서 반환되는 사용자 타입 정의
 interface User {
-  _id: string  // MongoDB의 _id 필드를 사용
+  _id: string
   email: string
   nickname?: string
-  // 기타 MongoDB users 컬렉션에 있는 필드들 추가
 }
 
 export default function UserList() {
@@ -20,18 +19,16 @@ export default function UserList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   // 현재 로그인한 사용자 정보 가져오기
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
-        // 1. localStorage에서 사용자 정보 확인
+        // localStorage에서 사용자 정보 확인
         const userStr = localStorage.getItem('user')
         if (userStr) {
           try {
             const userData = JSON.parse(userStr)
-            console.log('localStorage user data:', userData)
             if (userData._id || userData.id) {
               setCurrentUserId(userData._id || userData.id)
               setCurrentUserEmail(userData.email)
@@ -42,15 +39,13 @@ export default function UserList() {
           }
         }
 
-        // 2. accessToken에서 정보 추출
+        // accessToken에서 정보 추출
         const token = localStorage.getItem('accessToken')
         if (token) {
           try {
-            // JWT 토큰 디코딩 시도
             const base64Url = token.split('.')[1]
             const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
             const payload = JSON.parse(window.atob(base64))
-            console.log('Token payload:', payload)
             
             if (payload.id || payload.sub || payload.userId) {
               setCurrentUserId(payload.id || payload.sub || payload.userId)
@@ -62,12 +57,11 @@ export default function UserList() {
           }
         }
         
-        // 3. 세션 스토리지 확인
+        // 세션 스토리지 확인
         const sessionUserStr = sessionStorage.getItem('user')
         if (sessionUserStr) {
           try {
             const sessionUserData = JSON.parse(sessionUserStr)
-            console.log('sessionStorage user data:', sessionUserData)
             if (sessionUserData._id || sessionUserData.id) {
               setCurrentUserId(sessionUserData._id || sessionUserData.id)
               setCurrentUserEmail(sessionUserData.email)
@@ -101,21 +95,18 @@ export default function UserList() {
       }
       
       const data = await response.json()
-      console.log('API 응답 전체 데이터:', data)
-      setDebugInfo(data)
       
       if (data.users && Array.isArray(data.users)) {
         setUsers(data.users)
-        console.log(`${data.users.length}명의 사용자를 불러왔습니다`)
       } else {
         // 다른 형태로 데이터가 제공될 수 있음
         let foundUsers: User[] = []
         
-        // 1. 데이터가 직접 배열인 경우
+        // 데이터가 직접 배열인 경우
         if (Array.isArray(data)) {
           foundUsers = data
         } 
-        // 2. 데이터가 다른 구조인 경우
+        // 데이터가 다른 구조인 경우
         else if (typeof data === 'object' && data !== null) {
           const possibleFields = ['users', 'data', 'items', 'results']
           for (const field of possibleFields) {
@@ -139,9 +130,7 @@ export default function UserList() {
         
         if (foundUsers.length > 0) {
           setUsers(foundUsers)
-          console.log(`대체 방법으로 ${foundUsers.length}명의 사용자를 찾았습니다`)
         } else {
-          console.error('사용자 데이터를 찾을 수 없습니다:', data)
           throw new Error('사용자 데이터를 찾을 수 없습니다')
         }
       }
@@ -156,54 +145,53 @@ export default function UserList() {
   }
 
   // 자신을 제외한 사용자 필터링
-  const filteredUsersByCurrentUser = users.filter(user => {
-    // ID로 필터링
-    if (currentUserId && user._id === currentUserId) {
+  const filteredUsers = users.filter(user => {
+    // 현재 사용자 제외
+    if ((currentUserId && user._id === currentUserId) || 
+        (currentUserEmail && user.email === currentUserEmail)) {
       return false
     }
     
-    // 이메일로 필터링 (ID가 없거나 형식이 다른 경우 대비)
-    if (currentUserEmail && user.email === currentUserEmail) {
-      return false
+    // 검색어로 필터링
+    if (searchQuery) {
+      const name = (user.nickname || user.email?.split('@')[0] || '').toLowerCase()
+      const email = (user.email || '').toLowerCase()
+      return name.includes(searchQuery.toLowerCase()) || 
+             email.includes(searchQuery.toLowerCase())
     }
     
     return true
   })
 
-  // 검색어로 사용자 필터링
-  const filteredUsers = searchQuery 
-    ? filteredUsersByCurrentUser.filter(user => 
-        (user.nickname?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-        (user.email?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-      )
-    : filteredUsersByCurrentUser
-
-  // 대화 시작 - 채팅 페이지로 이동
+  // 대화 시작
   const startChat = (userId: string) => {
-    console.log(`${userId}와(과) 대화를 시작합니다`)
     router.push(`/chat/${userId}`)
   }
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>모든 사용자</h1>
-      
-      <div className={styles.searchContainer}>
-        <input
-          type="text"
-          className={styles.searchInput}
-          placeholder="사용자 검색..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+      <div className={styles.header}>
+        <h1 className={styles.title}>사용자 목록</h1>
+        <div className={styles.infoBar}>
+          <span className={styles.userCount}>
+            총 <strong>{filteredUsers.length}</strong>명의 사용자
+          </span>
+          <div className={styles.searchBox}>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="이름 또는 이메일로 검색..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
       </div>
       
       {error && (
         <div className={styles.error}>
           <p>{error}</p>
-          <button onClick={fetchUsers} className={styles.retryButton}>
-            다시 시도
-          </button>
+          <button onClick={fetchUsers} className={styles.button}>다시 시도</button>
         </div>
       )}
       
@@ -217,69 +205,30 @@ export default function UserList() {
           {searchQuery ? '검색 결과가 없습니다.' : '사용자가 없습니다.'}
         </div>
       ) : (
-        <div className={styles.userGrid}>
-          {filteredUsers.map(user => (
-            <div key={user._id} className={styles.userCard}>
-              <div className={styles.avatar}>
-                {((user.nickname || user.email?.split('@')[0] || '?')).charAt(0).toUpperCase()}
-              </div>
-              <div className={styles.userInfo}>
-                <h3 className={styles.userName}>
-                  {user.nickname || (user.email?.split('@')[0] || '이름 없음')}
-                </h3>
-                <p className={styles.userEmail}>{user.email || '이메일 없음'}</p>
-              </div>
-              <button 
-                className={styles.chatButton}
-                onClick={(e) => {
-                  e.stopPropagation(); // 이벤트 버블링 방지
-                  startChat(user._id);
-                }}
-              >
-                대화하기
-              </button>
-            </div>
-          ))}
+        <div className={styles.userListContainer}>
+          <ul className={styles.userList}>
+            {filteredUsers.map(user => (
+              <li key={user._id} className={styles.userItem}>
+                <div className={styles.userAvatar}>
+                  {(user.nickname || user.email?.split('@')[0] || '?').charAt(0).toUpperCase()}
+                </div>
+                <div className={styles.userInfo}>
+                  <h3 className={styles.userName}>
+                    {user.nickname || (user.email?.split('@')[0] || '이름 없음')}
+                  </h3>
+                  <p className={styles.userEmail}>{user.email || '이메일 없음'}</p>
+                </div>
+                <button 
+                  className={styles.chatButton}
+                  onClick={() => startChat(user._id)}
+                >
+                  대화하기
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
-
-      {/* 디버깅 정보 */}
-      <div style={{ marginTop: '20px', padding: '10px', border: '1px solid #ddd', fontSize: '12px' }}>
-        <h4>디버깅 정보</h4>
-        <p>현재 사용자 ID: {currentUserId || '알 수 없음'}</p>
-        <p>현재 사용자 이메일: {currentUserEmail || '알 수 없음'}</p>
-        <p>전체 사용자 수: {users.length}</p>
-        <p>필터링 후 사용자 수: {filteredUsers.length}</p>
-        <details>
-          <summary>로그인 확인</summary>
-          <div style={{ marginTop: '10px' }}>
-            <button onClick={() => {
-              // 사용자 정보를 직접 입력 (테스트용)
-              const testUserId = prompt('현재 사용자 ID를 입력하세요:')
-              if (testUserId) setCurrentUserId(testUserId)
-              
-              const testUserEmail = prompt('현재 사용자 이메일을 입력하세요:')
-              if (testUserEmail) setCurrentUserEmail(testUserEmail)
-            }}>
-              현재 사용자 정보 수동 입력
-            </button>
-          </div>
-        </details>
-        <button 
-          onClick={fetchUsers} 
-          style={{ padding: '5px 10px', marginTop: '10px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-        >
-          데이터 새로고침
-        </button>
-        <div style={{ marginTop: '10px' }}>
-          <details>
-            <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>API 응답 데이터 확인</summary>
-            <pre style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f5f5f5', padding: '10px', fontSize: '11px', maxHeight: '200px', overflow: 'auto' }}>
-              {JSON.stringify(debugInfo, null, 2)}
-            </pre>
-          </details>
-        </div>
-      </div>
     </div>
-  )
+  );
 }
