@@ -22,6 +22,11 @@ export default function UserList() {
 
   // 현재 로그인한 사용자 정보 가져오기
   useEffect(() => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) {
+      router.push('/')
+      return
+    }
     const getCurrentUser = async () => {
       try {
         // localStorage에서 사용자 정보 확인

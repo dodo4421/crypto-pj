@@ -7,6 +7,7 @@ import fs from 'fs'
 import path from 'path'
 import clientPromise from '../../../lib/mongodb'
 import { ObjectId } from 'mongodb'
+import crypto from 'crypto' // 암호화를 위한 crypto 모듈
 
 // JWT 페이로드 타입 확장
 interface CustomJwtPayload extends JwtPayload {
@@ -33,6 +34,75 @@ const isValidObjectId = (id: string): boolean => {
     return true;
   } catch (error) {
     return false;
+  }
+};
+
+// 암호화 키 생성 (사용자 ID와 비밀키 기반)
+const generateEncryptionKey = (userId: string, recipientId: string, secretKey: string): Buffer => {
+  const combinedKey = `${secretKey}-${userId}-${recipientId}`;
+  return crypto.createHash('sha256').update(combinedKey).digest();
+};
+
+// AES 암호화 함수
+const encryptMessage = (message: string, userId: string, recipientId: string, secretKey: string): string => {
+  try {
+    // 키 생성
+    const key = generateEncryptionKey(userId, recipientId, secretKey);
+    // 초기화 벡터 생성 (AES에 필요)
+    const iv = crypto.randomBytes(16);
+    // AES-256-CBC 암호화 생성
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+    
+    // 메시지 암호화
+    let encrypted = cipher.update(message, 'utf8', 'base64');
+    encrypted += cipher.final('base64');
+    
+    // IV와 암호화된 내용 함께 저장 (구분자로 분리하여 보관)
+    return iv.toString('hex') + ':' + encrypted;
+  } catch (error) {
+    console.error('Message encryption error:', error);
+    // 암호화 실패 시 오류 메시지 반환
+    return 'ENCRYPTION_ERROR';
+  }
+};
+
+// AES 복호화 함수
+const decryptMessage = (encryptedData: string, userId: string, recipientId: string, secretKey: string): string => {
+  try {
+    // 암호화된 데이터가 없거나 형식이 맞지 않으면 에러
+    if (!encryptedData || !encryptedData.includes(':')) {
+      return 'DECRYPTION_ERROR: Invalid format';
+    }
+
+    // IV와 암호화된 데이터 분리
+    const parts = encryptedData.split(':');
+    const iv = Buffer.from(parts[0], 'hex');
+    const encryptedText = parts[1];
+    
+    // 키 생성 (암호화에 사용한 것과 동일한 방식)
+    const key = generateEncryptionKey(userId, recipientId, secretKey);
+    
+    // 복호화
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+    let decrypted = decipher.update(encryptedText, 'base64', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  } catch (error) {
+    console.error('Message decryption error:', error);
+    return 'DECRYPTION_ERROR';
+  }
+};
+
+// 메시지 인증용 HMAC 생성 함수 (필요시 사용)
+const createHmac = (message: string, userId: string, recipientId: string, secretKey: string): string => {
+  try {
+    const key = generateEncryptionKey(userId, recipientId, secretKey);
+    const hmac = crypto.createHmac('sha256', key);
+    return hmac.update(message).digest('base64');
+  } catch (error) {
+    console.error('HMAC creation error:', error);
+    return '';
   }
 };
 
@@ -70,6 +140,10 @@ export default async function handler(
     const messagesCollection = db.collection('messages')
     const conversationsCollection = db.collection('conversations')
     const usersCollection = db.collection('users')
+
+    // 암호화를 위한 비밀 키 설정
+    // 실제 환경에서는 환경 변수 등에서 가져오는 것이 안전합니다
+    const SECRET_KEY = 'your-very-secure-and-long-secret-key-2025'
 
     // 연결된 사용자 맵
     const connectedUsers = new Map()
@@ -210,7 +284,25 @@ export default async function handler(
                       uc.user === socket.data.userId || uc.user === socket.data.nickname
                     )?.count || 0)
                   : 0;
+                
+                // lastMessage가 암호화되어 있으면 복호화
+                let lastMessage = conv.lastMessage;
+                if (lastMessage && lastMessage.content && lastMessage.encryptionAlgorithm === 'AES-256') {
+                  const decrypted = decryptMessage(
+                    lastMessage.content, 
+                    lastMessage.sender === socket.data.userId ? socket.data.userId : otherParticipantId,
+                    lastMessage.sender === socket.data.userId ? otherParticipantId : socket.data.userId,
+                    SECRET_KEY
+                  );
                   
+                  if (!decrypted.startsWith('DECRYPTION_ERROR')) {
+                    lastMessage = {
+                      ...lastMessage,
+                      content: decrypted.length > 30 ? decrypted.substring(0, 30) + '...' : decrypted
+                    };
+                  }
+                }
+                
                 return {
                   id: conv.roomId,
                   participant: {
@@ -218,7 +310,7 @@ export default async function handler(
                     email: otherParticipant?.email || 'Unknown',
                     nickname: otherParticipant?.nickname || otherParticipantId
                   },
-                  lastMessage: conv.lastMessage,
+                  lastMessage,
                   unreadCount,
                   updatedAt: conv.updatedAt
                 };
@@ -346,6 +438,24 @@ export default async function handler(
                     uc.user === userId || uc.user === userNickname
                   )?.count || 0)
                 : 0;
+              
+              // lastMessage가 암호화되어 있으면 복호화
+              let lastMessage = conv.lastMessage;
+              if (lastMessage && lastMessage.content && lastMessage.encryptionAlgorithm === 'AES-256') {
+                const decrypted = decryptMessage(
+                  lastMessage.content, 
+                  lastMessage.sender === userId ? userId : otherParticipantId,
+                  lastMessage.sender === userId ? otherParticipantId : userId,
+                  SECRET_KEY
+                );
+                
+                if (!decrypted.startsWith('DECRYPTION_ERROR')) {
+                  lastMessage = {
+                    ...lastMessage,
+                    content: decrypted.length > 30 ? decrypted.substring(0, 30) + '...' : decrypted
+                  };
+                }
+              }
                 
               return {
                 id: conv.roomId,
@@ -354,7 +464,7 @@ export default async function handler(
                   email: otherParticipant?.email || 'Unknown',
                   nickname: otherParticipant?.nickname || otherParticipantId
                 },
-                lastMessage: conv.lastMessage,
+                lastMessage,
                 unreadCount,
                 updatedAt: conv.updatedAt
               };
@@ -446,11 +556,32 @@ export default async function handler(
             .sort({ createdAt: 1 })
             .toArray();
 
-          // ID 필드 일관성 보장
-          const formattedMessages = messages.map(msg => ({
-            ...msg,
-            id: msg.id || msg._id.toString() // id 필드 보장
-          }));
+          // 암호화된 메시지 복호화하여 클라이언트에게 전송
+          const formattedMessages = messages.map(msg => {
+            // 암호화된 메시지를 복호화
+            let decryptedContent = msg.content;
+            
+            // AES 암호화된 메시지라면 복호화 시도
+            if (msg.encryptionAlgorithm === 'AES-256') {
+              decryptedContent = decryptMessage(
+                msg.content,
+                msg.sender,
+                msg.receiver,
+                SECRET_KEY
+              );
+              
+              // 복호화 실패 시 오류 메시지 유지
+              if (decryptedContent.startsWith('DECRYPTION_ERROR')) {
+                console.error(`Failed to decrypt message: ${msg.id || msg._id}`);
+              }
+            }
+            
+            return {
+              ...msg,
+              id: msg.id || msg._id.toString(), // id 필드 보장
+              content: decryptedContent // 복호화된 메시지 내용
+            };
+          });
 
           // 상대방 정보와 함께 대화 기록 전송
           socket.emit('chat_history', {
@@ -516,8 +647,8 @@ export default async function handler(
         }
       });
 
-      // 메시지 전송
-      socket.on('send_message', async ({ recipientId, content, encryptionAlgorithm }) => {
+      // 메시지 전송 (암호화 적용)
+      socket.on('send_message', async ({ recipientId, content, encryptionAlgorithm = 'AES-256' }) => {
         const userId = socket.data.userId;
         const userEmail = socket.data.email;
         const userNickname = socket.data.nickname;
@@ -541,7 +672,16 @@ export default async function handler(
           // 채팅방 ID 생성
           const roomId = [userId, recipientIdStr].sort().join('-');
 
-          // 새 메시지 생성
+          // 메시지 내용 암호화 (AES-256 사용)
+          const encryptedContent = encryptMessage(content, userId, recipientIdStr, SECRET_KEY);
+          
+          // 암호화 성공 여부 확인
+          if (encryptedContent === 'ENCRYPTION_ERROR') {
+            socket.emit('error', { message: '메시지 암호화에 실패했습니다.' });
+            return;
+          }
+          
+          // 새 메시지 생성 (암호화된 메시지만 저장)
           const newMessage = {
             roomId,
             sender: userId,
@@ -549,28 +689,34 @@ export default async function handler(
             senderEmail: userEmail,
             receiver: recipientIdStr,
             receiverNickname: recipient.nickname || recipientIdStr,
-            content,
-            encryptionAlgorithm: encryptionAlgorithm || 'AES-256',
+            content: encryptedContent, // 암호화된 메시지만 저장
+            encryptionAlgorithm, // 암호화 알고리즘 명시
             isRead: false,
             createdAt: new Date()
           };
+          // 암호화 확인 로그
+          console.log("원본 메시지:", content);
+          console.log("암호화된 메시지1:", encryptedContent);
 
           // 메시지 DB 저장
           const result = await messagesCollection.insertOne(newMessage);
           const messageId = result.insertedId.toString();
-          const message = { 
+
+          // 클라이언트에게 보낼 메시지 객체 생성 (복호화된 메시지 사용)
+          const clientMessage = { 
             ...newMessage, 
             _id: result.insertedId,
-            id: messageId // 항상 문자열 ID 제공
+            id: messageId,
+            encryptedContent // 클라이언트에게는 원본 메시지 전송
           };
-
+          
           // 대화 정보 업데이트 (또는 생성)
           await conversationsCollection.updateOne(
             { roomId },
             {
               $set: {
                 lastMessage: {
-                  content: content.length > 30 ? content.substring(0, 30) + '...' : content,
+                  content: encryptedContent, // 암호화된 메시지로 저장
                   sender: userId,
                   encryptionAlgorithm,
                   createdAt: newMessage.createdAt
@@ -588,7 +734,8 @@ export default async function handler(
           );
 
           // 채팅방에 메시지 전송
-          io.to(roomId).emit('new_message', message);
+          io.to(roomId).emit('new_message', clientMessage);
+          
 
           // 상대방이 온라인인지 확인
           const recipientSocketId = connectedUsers.get(recipientIdStr) || connectedUsers.get(recipient.nickname);
@@ -613,7 +760,6 @@ export default async function handler(
           socket.emit('error', { message: '메시지 전송 중 오류가 발생했습니다.' });
         }
       });
-
       // 타이핑 상태 이벤트 처리
       socket.on('typing', ({ recipientId, isTyping }) => {
         const userId = socket.data.userId;
