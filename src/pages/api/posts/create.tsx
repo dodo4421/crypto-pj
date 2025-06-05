@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import jwt from 'jsonwebtoken'
-import clientPromise from '../../../../lib/mongodb'
+import clientPromise from '../../../lib/mongodb'
 import fs from 'fs'
 import path from 'path'
 
@@ -27,7 +27,7 @@ export default async function handler(
     const result = await db.collection('gesipan').insertOne({
       title,
       content,
-      author: decoded.userId,
+      writer: decoded.userId,
       createdAt: new Date(),
     })
 

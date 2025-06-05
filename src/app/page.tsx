@@ -30,7 +30,7 @@ export default function LoginPage() {
       localStorage.setItem('accessToken', data.token)
 
       // ✅ 로그인 성공 시 /test로 이동
-      router.push('/test')
+      router.push('/gesipan')
     } catch (err) {
       console.error(err)
       setError('서버 오류 발생')
@@ -42,20 +42,20 @@ export default function LoginPage() {
       <h2>🔐 로그인</h2>
       <form onSubmit={handleLogin}>
         <input
-          type="email"
-          placeholder="이메일"
+          type='email'
+          placeholder='이메일'
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
         <br />
         <input
-          type="password"
-          placeholder="비밀번호"
+          type='password'
+          placeholder='비밀번호'
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
         <br />
-        <button type="submit">로그인</button>
+        <button type='submit'>로그인</button>
       </form>
 
       {error && <p style={{ color: 'red' }}>{error}</p>}

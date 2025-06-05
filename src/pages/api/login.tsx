@@ -2,7 +2,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import clientPromise from '../../../lib/mongodb'
+import clientPromise from '../../lib/mongodb'
 import fs from 'fs'
 import path from 'path'
 
