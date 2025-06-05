@@ -74,7 +74,8 @@
   gap: 10px;
 }
 
-.loading, .emptyChat {
+.loading,
+.emptyChat {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -94,8 +95,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .dateDivider {
@@ -109,7 +114,7 @@
 
 .dateDivider::before,
 .dateDivider::after {
-  content: "";
+  content: '';
   flex-grow: 1;
   height: 1px;
   background-color: #dee2e6;
@@ -202,13 +207,24 @@
   opacity: 0.7;
 }
 
-.dot:nth-child(1) { animation-delay: 0s; }
-.dot:nth-child(2) { animation-delay: 0.3s; }
-.dot:nth-child(3) { animation-delay: 0.6s; }
+.dot:nth-child(1) {
+  animation-delay: 0s;
+}
+.dot:nth-child(2) {
+  animation-delay: 0.3s;
+}
+.dot:nth-child(3) {
+  animation-delay: 0.6s;
+}
 
 @keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
 }
 
 /* 채팅 푸터 스타일 */
@@ -294,7 +310,7 @@
     margin: 0;
     border-radius: 0;
   }
-  
+
   .message {
     max-width: 85%;
   }

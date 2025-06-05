@@ -1,60 +1,60 @@
 // pages/chat/[id].tsx 또는 app/chat/[id]/page.tsx
-'use client'
+'use client';
 
-import { useEffect, useState, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import AuthGuard from '@/components/AuthGuard'
-import { io, Socket } from 'socket.io-client'
-import styles from './chat.module.css'
+import { useEffect, useState, useRef } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import AuthGuard from '@/components/AuthGuard';
+import { io, Socket } from 'socket.io-client';
+import styles from './chat.module.css';
 
 interface Message {
-  id: string
-  _id?: string | object
-  sender: string
-  content: string          // 이미 복호화된 메시지가 전달됨
-  encryptionAlgorithm: string
-  isRead: boolean
-  createdAt: string
+  id: string;
+  _id?: string | object;
+  sender: string;
+  content: string; // 이미 복호화된 메시지가 전달됨
+  encryptionAlgorithm: string;
+  isRead: boolean;
+  createdAt: string;
 }
 
 interface User {
-  id: string
-  email: string
-  nickname?: string
+  id: string;
+  email: string;
+  nickname?: string;
 }
 
 export default function ChatRoom() {
-  const router = useRouter()
-  const params = useParams()
-  const recipientId = params?.id as string
-  
-  const [socket, setSocket] = useState<Socket | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [newMessage, setNewMessage] = useState('')
-  const [recipientInfo, setRecipientInfo] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [encryptionAlgorithm, setEncryptionAlgorithm] = useState('AES-256')  // 고정 값 사용
-  const [isTyping, setIsTyping] = useState(false)
-  const [recipientIsTyping, setRecipientIsTyping] = useState(false)
-  const [authenticated, setAuthenticated] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const router = useRouter();
+  const params = useParams();
+  const recipientId = params?.id as string;
 
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [recipientInfo, setRecipientInfo] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [encryptionAlgorithm, setEncryptionAlgorithm] = useState('AES-256'); // 고정 값 사용
+  const [isTyping, setIsTyping] = useState(false);
+  const [recipientIsTyping, setRecipientIsTyping] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Socket.io 연결 설정 (변경 없음)
   useEffect(() => {
     // 토큰 확인
-    const token = localStorage.getItem('accessToken')
+    const token = localStorage.getItem('accessToken');
     if (!token) {
-      router.push('/')
-      return
+      router.push('/');
+      return;
     }
 
     // recipientId가 없으면 메시지 목록으로 리디렉션
     if (!recipientId) {
-      router.push('/messages')
-      return
+      router.push('/messages');
+      return;
     }
 
     // Socket.io 연결
@@ -63,14 +63,14 @@ export default function ChatRoom() {
       if (socket) {
         return; // 기존 소켓이 있으면 새로 만들지 않음
       }
-      
+
       const socketInstance = io({
         path: '/api/socketio',
         autoConnect: true,
         reconnectionAttempts: 3, // 재연결 시도 횟수 제한
         reconnectionDelay: 1000, // 재연결 간격
-        timeout: 5000 // 연결 타임아웃
-      })
+        timeout: 5000, // 연결 타임아웃
+      });
 
       // 연결 성공 시 인증 수행
       socketInstance.on('connect', () => {
@@ -91,37 +91,40 @@ export default function ChatRoom() {
         setLoading(false);
       });
 
-      setSocket(socketInstance)
+      setSocket(socketInstance);
 
       // 컴포넌트 언마운트 시 연결 해제
       return () => {
         if (typingTimeoutRef.current) {
-          clearTimeout(typingTimeoutRef.current)
+          clearTimeout(typingTimeoutRef.current);
         }
         console.log('Disconnecting socket');
         socketInstance.disconnect();
         setSocket(null);
-      }
+      };
     } catch (error) {
-      console.error('Socket initialization error:', error)
-      setError('소켓 연결 중 오류가 발생했습니다.')
+      console.error('Socket initialization error:', error);
+      setError('소켓 연결 중 오류가 발생했습니다.');
       setLoading(false);
     }
-  }, [router, recipientId])
+  }, [router, recipientId]);
 
   // 인증 성공 이벤트 핸들러 (변경 없음)
   useEffect(() => {
     if (!socket) return;
-    
+
     const handleAuthSuccess = () => {
       setAuthenticated(true);
       setError(null);
-      console.log('Authentication successful, joining room with recipient:', recipientId);
+      console.log(
+        'Authentication successful, joining room with recipient:',
+        recipientId
+      );
       socket.emit('join_room', recipientId);
     };
-    
+
     socket.on('auth_success', handleAuthSuccess);
-    
+
     return () => {
       socket.off('auth_success', handleAuthSuccess);
     };
@@ -129,9 +132,9 @@ export default function ChatRoom() {
 
   // Socket.io 이벤트 리스너 설정 (변경 없음 - 서버에서 복호화된 메시지가 전달됨)
   useEffect(() => {
-    if (!socket || !recipientId) return
+    if (!socket || !recipientId) return;
 
-    console.log('Setting up chat room event listeners')
+    console.log('Setting up chat room event listeners');
 
     // 인터페이스 정의
     interface ChatHistoryData {
@@ -167,23 +170,24 @@ export default function ChatRoom() {
 
     const handleNewMessage = (message: Message) => {
       console.log('New message received:', message);
-      setMessages(prev => [...prev, message]);
-      
+      setMessages((prev) => [...prev, message]);
+
       // 읽음 표시 업데이트
       if (message.sender === recipientId) {
-        const messageId = message.id || (message._id ? message._id.toString() : undefined);
+        const messageId =
+          message.id || (message._id ? message._id.toString() : undefined);
         if (messageId) {
           socket.emit('mark_read', {
             roomId: [socket.id, recipientId].sort().join('-'),
-            messageIds: [messageId]
+            messageIds: [messageId],
           });
         }
       }
     };
 
     const handleMessagesRead = ({ messageIds }: MessagesReadData) => {
-      setMessages(prev => 
-        prev.map(msg => {
+      setMessages((prev) =>
+        prev.map((msg) => {
           const msgId = msg.id || (msg._id ? msg._id.toString() : '');
           return messageIds.includes(msgId) ? { ...msg, isRead: true } : msg;
         })
@@ -208,7 +212,7 @@ export default function ChatRoom() {
     socket.on('messages_read', handleMessagesRead);
     socket.on('user_typing', handleUserTyping);
     socket.on('error', handleError);
-    
+
     // 인증이 되었다면 채팅방 참여
     if (authenticated) {
       socket.emit('join_room', recipientId);
@@ -220,85 +224,94 @@ export default function ChatRoom() {
       socket.off('messages_read', handleMessagesRead);
       socket.off('user_typing', handleUserTyping);
       socket.off('error', handleError);
-    }
-  }, [socket, recipientId, authenticated])
+    };
+  }, [socket, recipientId, authenticated]);
 
   // 메시지 보내기 (암호화 알고리즘 고정)
   const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!socket || !newMessage.trim() || !recipientId || !authenticated) return
+    e.preventDefault();
+    if (!socket || !newMessage.trim() || !recipientId || !authenticated) return;
 
-    console.log('Sending message to:', recipientId)
+    console.log('Sending message to:', recipientId);
     socket.emit('send_message', {
       recipientId,
       content: newMessage,
-      encryptionAlgorithm: 'AES-256'  // 항상 AES-256 사용
-    })
+      encryptionAlgorithm: 'AES-256', // 항상 AES-256 사용
+    });
 
-    setNewMessage('')
-    setIsTyping(false)
-    
+    setNewMessage('');
+    setIsTyping(false);
+
     // 타이핑 중지 알림
     socket.emit('typing', {
       recipientId,
-      isTyping: false
-    })
-  }
+      isTyping: false,
+    });
+  };
 
   // 메시지 입력 핸들러 (변경 없음)
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
-    setNewMessage(value)
-    
-    if (!socket || !recipientId || !authenticated) return
+    const value = e.target.value;
+    setNewMessage(value);
+
+    if (!socket || !recipientId || !authenticated) return;
 
     // 타이핑 상태 변경
     if (!isTyping && value) {
-      setIsTyping(true)
+      setIsTyping(true);
       socket.emit('typing', {
         recipientId,
-        isTyping: true
-      })
+        isTyping: true,
+      });
     }
-    
+
     // 타이핑 중지 타이머 설정
     if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current)
+      clearTimeout(typingTimeoutRef.current);
     }
-    
+
     typingTimeoutRef.current = setTimeout(() => {
       if (isTyping) {
-        setIsTyping(false)
+        setIsTyping(false);
         socket.emit('typing', {
           recipientId,
-          isTyping: false
-        })
+          isTyping: false,
+        });
       }
-    }, 2000) // 2초 동안 타이핑이 없으면 중지 상태로 변경
-  }
+    }, 2000); // 2초 동안 타이핑이 없으면 중지 상태로 변경
+  };
 
   // 메시지 목록 자동 스크롤 (변경 없음)
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages])
+  }, [messages]);
+  useEffect(() => {
+    if (!socket || !recipientId || !authenticated) return;
 
+    const interval = setInterval(() => {
+      console.log('[⏱] Polling for new messages...');
+      socket.emit('join_room', recipientId); // 메시지 히스토리 재요청
+    }, 1000); // 1초 간격
+
+    return () => clearInterval(interval);
+  }, [socket, recipientId, authenticated]);
   // 메시지 시간 형식 (변경 없음)
   const formatMessageTime = (dateString: string) => {
-    const date = new Date(dateString)
+    const date = new Date(dateString);
     return date.toLocaleTimeString([], {
       hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
+      minute: '2-digit',
+    });
+  };
 
   // 재연결 시도 (변경 없음)
   const handleRetryConnection = () => {
     setError(null);
     setLoading(true);
     setAuthenticated(false);
-    
+
     if (socket) {
       if (socket.connected) {
         socket.emit('join_room', recipientId);
@@ -317,16 +330,16 @@ export default function ChatRoom() {
       if (token) {
         const newSocket = io({
           path: '/api/socketio',
-          autoConnect: true
+          autoConnect: true,
         });
         setSocket(newSocket);
-        
+
         newSocket.on('connect', () => {
           newSocket.emit('authenticate', token);
         });
       }
     }
-  }
+  };
 
   // UI 렌더링 (변경 없음)
   return (
@@ -334,29 +347,39 @@ export default function ChatRoom() {
       <div className={styles.chatContainer}>
         {/* 채팅방 헤더 */}
         <div className={styles.chatHeader}>
-          <button className={styles.backButton} onClick={() => router.push('/messages')}>
+          <button
+            className={styles.backButton}
+            onClick={() => router.push('/messages')}
+          >
             &larr; 뒤로
           </button>
-          
+
           {loading ? (
             <div className={styles.recipientLoading}>로딩 중...</div>
           ) : recipientInfo ? (
             <div className={styles.recipientInfo}>
               <div className={styles.recipientAvatar}>
-                {(recipientInfo.nickname || recipientInfo.email.split('@')[0]).charAt(0).toUpperCase()}
+                {(recipientInfo.nickname || recipientInfo.email.split('@')[0])
+                  .charAt(0)
+                  .toUpperCase()}
               </div>
               <div className={styles.recipientDetails}>
-                <h2>{recipientInfo.nickname || recipientInfo.email.split('@')[0]}</h2>
+                <h2>
+                  {recipientInfo.nickname || recipientInfo.email.split('@')[0]}
+                </h2>
                 <p>{recipientInfo.email}</p>
-                {recipientIsTyping && <p className={styles.typingIndicator}>입력 중...</p>}
+                {recipientIsTyping && (
+                  <p className={styles.typingIndicator}>입력 중...</p>
+                )}
               </div>
             </div>
           ) : (
-            <div className={styles.recipientError}>사용자 정보를 불러올 수 없습니다</div>
+            <div className={styles.recipientError}>
+              사용자 정보를 불러올 수 없습니다
+            </div>
           )}
-          
         </div>
-        
+
         {/* 메시지 목록 */}
         <div className={styles.messagesContainer}>
           {loading ? (
@@ -367,8 +390,8 @@ export default function ChatRoom() {
           ) : error ? (
             <div className={styles.error}>
               <p>{error}</p>
-              <button 
-                className={styles.retryButton} 
+              <button
+                className={styles.retryButton}
                 onClick={handleRetryConnection}
               >
                 다시 시도
@@ -383,12 +406,16 @@ export default function ChatRoom() {
             <>
               {messages.map((message, index) => {
                 const isMine = message.sender !== recipientId;
-                const messageId = message.id || (message._id ? message._id.toString() : `msg-${index}`);
-                
+                const messageId =
+                  message.id ||
+                  (message._id ? message._id.toString() : `msg-${index}`);
+
                 return (
-                  <div 
+                  <div
                     key={messageId} // 고유한 key 확보
-                    className={`${styles.messageItem} ${isMine ? styles.myMessage : styles.theirMessage}`}
+                    className={`${styles.messageItem} ${
+                      isMine ? styles.myMessage : styles.theirMessage
+                    }`}
                   >
                     <div className={styles.messageContent}>
                       {message.content}
@@ -404,13 +431,13 @@ export default function ChatRoom() {
                       )}
                     </div>
                   </div>
-                )
+                );
               })}
               <div ref={messagesEndRef} />
             </>
           )}
         </div>
-        
+
         {/* 메시지 입력 영역 */}
         <form className={styles.messageInputForm} onSubmit={sendMessage}>
           <textarea
@@ -422,20 +449,22 @@ export default function ChatRoom() {
             rows={2}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                sendMessage(e)
+                e.preventDefault();
+                sendMessage(e);
               }
             }}
           />
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className={styles.sendButton}
-            disabled={!newMessage.trim() || loading || !!error || !authenticated}
+            disabled={
+              !newMessage.trim() || loading || !!error || !authenticated
+            }
           >
             전송
           </button>
         </form>
       </div>
     </AuthGuard>
-  )
+  );
 }
