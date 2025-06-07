@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { io, Socket } from 'socket.io-client'
-import styles from '../messages/messages.module.css'
+import styles from './messages.module.css'
 
 // 타입 정의
 interface User {
@@ -49,19 +49,17 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  // 중복 제거 함수 개선
+  // 중복 제거 함수
   const removeDuplicateConversations = useCallback((convs: Conversation[]): Conversation[] => {
     const uniqueConversations = new Map<string, Conversation>()
     
     convs.forEach(conv => {
-      // participant ID를 기준으로 중복 제거 (더 정확한 방법)
       const participantId = conv.participant.id
       const key = `${currentUserId}-${participantId}`
       
       if (!uniqueConversations.has(key)) {
         uniqueConversations.set(key, conv)
       } else {
-        // 이미 존재하는 경우, 더 최신 데이터로 업데이트
         const existing = uniqueConversations.get(key)!
         const existingTime = new Date(existing.updatedAt).getTime()
         const newTime = new Date(conv.updatedAt).getTime()
@@ -119,191 +117,218 @@ export default function MessagesPage() {
     const token = localStorage.getItem('accessToken')
     if (!token) return
 
-    const newSocket = io(process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000', {
-      path: '/api/socketio',
-      transports: ['websocket', 'polling'],
-    })
-
-    newSocket.on('connect', () => {
-      console.log('Socket connected:', newSocket.id)
-      newSocket.emit('authenticate', token)
-    })
-
-    newSocket.on('auth_success', () => {
-      console.log('Authentication successful')
-      setIsAuthenticated(true)
-      setError(null)
-      newSocket.emit('get_conversations')
-    })
-
-    newSocket.on('auth_error', (data) => {
-      console.error('Authentication failed:', data.message)
-      setError(data.message)
-      setIsAuthenticated(false)
-    })
-
-    // 대화 목록 수신 - 개선된 로직
-    newSocket.on('conversations_list', (conversationsList: any[]) => {
-      console.log('Raw conversations data:', conversationsList)
-      
-      if (!conversationsList || conversationsList.length === 0) {
-        setConversations([])
-        setLoading(false)
-        return
-      }
-      
-      // 데이터 구조 정규화 및 필터링 개선
-      const normalizedConversations = conversationsList
-        .filter(conv => conv && conv.participant) // 유효한 데이터만 필터링
-        .map((conv, index) => {
-          const roomId = conv.id || conv.roomId || conv._id || `conv-${index}-${Date.now()}`
+    // Socket.io 서버 초기화를 위한 API 호출
+    const initializeSocket = async () => {
+      try {
+        console.log('Initializing Socket.io server...')
+        
+        // Socket.io 서버 초기화
+        await fetch('/api/socketio')
+        
+        // 약간의 지연 후 클라이언트 연결
+        setTimeout(() => {
+          console.log('Creating socket connection...')
           
-          return {
-            id: roomId,
-            participant: {
-              id: conv.participant?.id || conv.participant?._id,
-              email: conv.participant?.email || '',
-              nickname: conv.participant?.nickname,
-              online: conv.participant?.online || false
-            },
-            lastMessage: conv.lastMessage && conv.lastMessage.content ? {
-              id: conv.lastMessage.id || conv.lastMessage._id || `msg-${index}`,
-              content: conv.lastMessage.content,
-              sender: conv.lastMessage.sender || '',
-              senderNickname: conv.lastMessage.senderNickname || '',
-              createdAt: conv.lastMessage.createdAt || new Date().toISOString(),
-              isRead: conv.lastMessage.isRead || false
-            } : null,
-            unreadCount: conv.unreadCount || 0,
-            updatedAt: conv.updatedAt || new Date().toISOString()
-          }
-        })
-        .filter(conv => conv.participant.id) // participant ID가 있는 것만
-      
-      // 중복 제거
-      const uniqueConversations = removeDuplicateConversations(normalizedConversations)
-      
-      // 최신 업데이트 순으로 정렬
-      const sortedConversations = uniqueConversations.sort((a, b) => 
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      )
-      
-      console.log('Final conversations after deduplication:', sortedConversations)
-      setConversations(sortedConversations)
-      setLoading(false)
-    })
-
-    // 새 메시지 알림 처리
-    newSocket.on('message_notification', (data) => {
-      console.log('Message notification received:', data)
-      setConversations(prev => {
-        const updated = prev.map(conv => {
-          if (conv.id === data.roomId) {
-            return {
-              ...conv,
-              lastMessage: data.message,
-              unreadCount: conv.unreadCount + 1,
-              updatedAt: new Date().toISOString()
+          const newSocket = io(
+            process.env.NODE_ENV === 'production' 
+              ? window.location.origin 
+              : 'http://localhost:3000',
+            {
+              path: '/api/socketio',
+              transports: ['polling', 'websocket'], // polling을 먼저 시도
+              upgrade: true,
+              rememberUpgrade: false,
+              timeout: 20000,
+              forceNew: true,
             }
-          }
-          return conv
-        })
-        
-        const uniqueUpdated = removeDuplicateConversations(updated)
-        return uniqueUpdated.sort((a, b) => 
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        )
-      })
-    })
-
-    // 새 대화방 생성 이벤트 처리 추가
-    newSocket.on('conversation_created', (newConversation) => {
-      console.log('New conversation created:', newConversation)
-      
-      setConversations(prev => {
-        // 이미 존재하는지 확인
-        const exists = prev.some(conv => 
-          conv.id === newConversation.id || 
-          conv.participant.id === newConversation.participant.id
-        )
-        
-        if (exists) {
-          console.log('Conversation already exists, skipping...')
-          return prev
-        }
-        
-        // 새 대화를 목록 맨 위에 추가
-        const updated = [newConversation, ...prev]
-        
-        // 중복 제거 후 정렬
-        const uniqueUpdated = removeDuplicateConversations(updated)
-        return uniqueUpdated.sort((a, b) => 
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        )
-      })
-    })
-
-    // 채팅 기록 받기 (새 대화방 입장 시)
-    newSocket.on('chat_history', (data) => {
-      console.log('Chat history received:', data)
-      
-      // 대화 목록에 새 대화가 없으면 추가
-      if (data.messages.length === 0 && data.recipientInfo) {
-        const newConversation: Conversation = {
-          id: data.roomId,
-          participant: {
-            id: data.recipientInfo.id,
-            email: data.recipientInfo.email,
-            nickname: data.recipientInfo.nickname,
-            online: false
-          },
-          lastMessage: null,
-          unreadCount: 0,
-          updatedAt: new Date().toISOString()
-        }
-        
-        setConversations(prev => {
-          const exists = prev.some(conv => 
-            conv.id === newConversation.id || 
-            conv.participant.id === newConversation.participant.id
           )
-          
-          if (!exists) {
-            const updated = [newConversation, ...prev]
-            const uniqueUpdated = removeDuplicateConversations(updated)
-            return uniqueUpdated.sort((a, b) => 
+
+          newSocket.on('connect', () => {
+            console.log('Socket connected:', newSocket.id)
+            newSocket.emit('authenticate', token)
+          })
+
+          newSocket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error)
+            setError('서버 연결에 실패했습니다.')
+          })
+
+          newSocket.on('auth_success', () => {
+            console.log('Authentication successful')
+            setIsAuthenticated(true)
+            setError(null)
+            newSocket.emit('get_conversations')
+          })
+
+          newSocket.on('auth_error', (data) => {
+            console.error('Authentication failed:', data.message)
+            setError(data.message)
+            setIsAuthenticated(false)
+          })
+
+          // 대화 목록 수신
+          newSocket.on('conversations_list', (conversationsList: any[]) => {
+            console.log('Raw conversations data:', conversationsList)
+            
+            if (!conversationsList || conversationsList.length === 0) {
+              setConversations([])
+              setLoading(false)
+              return
+            }
+            
+            // 데이터 구조 정규화 및 필터링
+            const normalizedConversations = conversationsList
+              .filter(conv => conv && conv.participant)
+              .map((conv, index) => {
+                const roomId = conv.id || conv.roomId || conv._id || `conv-${index}-${Date.now()}`
+                
+                return {
+                  id: roomId,
+                  participant: {
+                    id: conv.participant?.id || conv.participant?._id,
+                    email: conv.participant?.email || '',
+                    nickname: conv.participant?.nickname,
+                    online: conv.participant?.online || false
+                  },
+                  lastMessage: conv.lastMessage && conv.lastMessage.content ? {
+                    id: conv.lastMessage.id || conv.lastMessage._id || `msg-${index}`,
+                    content: conv.lastMessage.content,
+                    sender: conv.lastMessage.sender || '',
+                    senderNickname: conv.lastMessage.senderNickname || '',
+                    createdAt: conv.lastMessage.createdAt || new Date().toISOString(),
+                    isRead: conv.lastMessage.isRead || false
+                  } : null,
+                  unreadCount: conv.unreadCount || 0,
+                  updatedAt: conv.updatedAt || new Date().toISOString()
+                }
+              })
+              .filter(conv => conv.participant.id)
+            
+            // 중복 제거
+            const uniqueConversations = removeDuplicateConversations(normalizedConversations)
+            
+            // 최신 업데이트 순으로 정렬
+            const sortedConversations = uniqueConversations.sort((a, b) => 
               new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
             )
-          }
-          
-          return prev
-        })
+            
+            console.log('Final conversations after deduplication:', sortedConversations)
+            setConversations(sortedConversations)
+            setLoading(false)
+          })
+
+          // 새 메시지 알림 처리
+          newSocket.on('message_notification', (data) => {
+            console.log('Message notification received:', data)
+            setConversations(prev => {
+              const updated = prev.map(conv => {
+                if (conv.id === data.roomId) {
+                  return {
+                    ...conv,
+                    lastMessage: data.message,
+                    unreadCount: conv.unreadCount + 1,
+                    updatedAt: new Date().toISOString()
+                  }
+                }
+                return conv
+              })
+              
+              const uniqueUpdated = removeDuplicateConversations(updated)
+              return uniqueUpdated.sort((a, b) => 
+                new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+              )
+            })
+          })
+
+          // 새 대화방 생성 이벤트 처리
+          newSocket.on('conversation_created', (newConversation) => {
+            console.log('New conversation created:', newConversation)
+            
+            setConversations(prev => {
+              const exists = prev.some(conv => 
+                conv.id === newConversation.id || 
+                conv.participant.id === newConversation.participant.id
+              )
+              
+              if (exists) {
+                console.log('Conversation already exists, skipping...')
+                return prev
+              }
+              
+              const updated = [newConversation, ...prev]
+              const uniqueUpdated = removeDuplicateConversations(updated)
+              return uniqueUpdated.sort((a, b) => 
+                new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+              )
+            })
+          })
+
+          // 채팅 기록 받기 (새 대화방 입장 시)
+          newSocket.on('chat_history', (data) => {
+            console.log('Chat history received:', data)
+            
+            if (data.messages.length === 0 && data.recipientInfo) {
+              const newConversation: Conversation = {
+                id: data.roomId,
+                participant: {
+                  id: data.recipientInfo.id,
+                  email: data.recipientInfo.email,
+                  nickname: data.recipientInfo.nickname,
+                  online: false
+                },
+                lastMessage: null,
+                unreadCount: 0,
+                updatedAt: new Date().toISOString()
+              }
+              
+              setConversations(prev => {
+                const exists = prev.some(conv => 
+                  conv.id === newConversation.id || 
+                  conv.participant.id === newConversation.participant.id
+                )
+                
+                if (!exists) {
+                  const updated = [newConversation, ...prev]
+                  const uniqueUpdated = removeDuplicateConversations(updated)
+                  return uniqueUpdated.sort((a, b) => 
+                    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+                  )
+                }
+                
+                return prev
+              })
+            }
+          })
+
+          newSocket.on('error', (data) => {
+            console.error('Socket error:', data.message)
+            setError(data.message)
+          })
+
+          setSocket(newSocket)
+        }, 1000) // 1초 지연
+        
+      } catch (error) {
+        console.error('Socket initialization error:', error)
+        setError('소켓 초기화에 실패했습니다.')
       }
-    })
+    }
 
-    newSocket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error)
-      setError('서버 연결에 실패했습니다.')
-    })
-
-    newSocket.on('error', (data) => {
-      console.error('Socket error:', data.message)
-      setError(data.message)
-    })
-
-    setSocket(newSocket)
+    initializeSocket()
 
     return () => {
-      newSocket.off('conversations_list')
-      newSocket.off('message_notification')
-      newSocket.off('conversation_created') // 추가
-      newSocket.off('chat_history') // 추가
-      newSocket.off('users_list')
-      newSocket.disconnect()
+      if (socket) {
+        socket.off('conversations_list')
+        socket.off('message_notification')
+        socket.off('conversation_created')
+        socket.off('chat_history')
+        socket.off('users_list')
+        socket.disconnect()
+      }
     }
   }, [currentUserId, removeDuplicateConversations])
 
-  // 모든 사용자 목록 가져오기 (새 대화용) - 개선
+  // 모든 사용자 목록 가져오기
   const fetchAllUsers = useCallback(async () => {
     console.log('=== fetchAllUsers called ===')
     console.log('socket:', !!socket)
@@ -313,7 +338,6 @@ export default function MessagesPage() {
     
     try {
       if (socket && isAuthenticated) {
-        // 기존 리스너 제거
         socket.off('users_list')
         
         console.log('Emitting get_users...')
@@ -328,11 +352,9 @@ export default function MessagesPage() {
             return
           }
           
-          // 기존 대화 상대방 ID 목록 생성
           const existingParticipantIds = conversations.map(conv => conv.participant.id)
           console.log('Existing participant IDs:', existingParticipantIds)
           
-          // 중복 제거된 사용자 목록
           const uniqueUsers = usersList.filter((user, index, self) => {
             const userId = user._id || user.id
             return index === self.findIndex(u => (u._id || u.id) === userId)
@@ -340,7 +362,6 @@ export default function MessagesPage() {
           
           console.log('Unique users:', uniqueUsers)
           
-          // 현재 사용자와 기존 대화 상대방을 제외한 사용자만 필터링
           const availableUsers = uniqueUsers.filter(user => {
             const userId = user._id || user.id
             
@@ -364,13 +385,12 @@ export default function MessagesPage() {
           
           console.log('Available users after filtering:', availableUsers)
           
-          // ID 속성 보장
           const formattedUsers = availableUsers.map(user => {
             const finalId = user._id || user.id
             return {
               ...user,
               id: finalId,
-              _id: finalId // 둘 다 보장
+              _id: finalId
             }
           })
           
@@ -403,7 +423,7 @@ export default function MessagesPage() {
     router.push(`/chat/${participantId}`)
   }
 
-  // 새 대화 시작 - 완전 개선
+  // 새 대화 시작
   const startNewChat = (userId: string) => {
     console.log('=== startNewChat Debug ===')
     console.log('Target userId:', userId)
@@ -422,16 +442,14 @@ export default function MessagesPage() {
     setShowNewChatModal(false)
     setSearchQuery('')
     
-    // 소켓이 연결되어 있으면 즉시 방 참여 시도
     if (socket && isAuthenticated) {
       console.log('Emitting join_room for new chat with userId:', trimmedUserId)
       socket.emit('join_room', trimmedUserId)
       
-      // 잠시 후 대화 목록 새로고침 (방이 생성될 시간을 줌)
       setTimeout(() => {
         console.log('Requesting updated conversations list')
         socket.emit('get_conversations')
-      }, 1000) // 1초 후
+      }, 1000)
     } else {
       console.warn('Socket not connected or not authenticated')
     }
@@ -440,7 +458,7 @@ export default function MessagesPage() {
     router.push(`/chat/${trimmedUserId}`)
   }
 
-  // 검색된 사용자 필터링 (새 대화용)
+  // 검색된 사용자 필터링
   const filteredUsers = allUsers.filter(user => {
     if (searchQuery.trim() === '') return true
     
@@ -483,9 +501,8 @@ export default function MessagesPage() {
     }
   }
 
-  // 메시지 내용 처리 - 개선
+  // 메시지 내용 처리
   const getLastMessageContent = (conversation: Conversation) => {
-    // lastMessage가 없거나 content가 비어있으면 null 반환 (조건부 렌더링에서 처리)
     if (!conversation.lastMessage || !conversation.lastMessage.content?.trim()) {
       return null
     }
@@ -494,7 +511,7 @@ export default function MessagesPage() {
     return content.length > 30 ? content.substring(0, 30) + '...' : content
   }
 
-  // 참가자 이름 표시 개선
+  // 참가자 이름 표시
   const getParticipantDisplayName = (participant: Conversation['participant']) => {
     if (participant.nickname?.trim()) {
       return participant.nickname.trim()
@@ -562,7 +579,7 @@ export default function MessagesPage() {
               
               return (
                 <li 
-                  key={`${conversation.participant.id}-${index}`} // participant ID 기반 키
+                  key={`${conversation.participant.id}-${index}`}
                   className={styles.conversationItem}
                   onClick={() => goToChat(conversation.participant.id)}
                 >
