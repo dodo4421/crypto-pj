@@ -404,6 +404,29 @@ export default function MessagesPage() {
       console.error('사용자 목록 불러오기 오류:', error)
     }
   }, [socket, isAuthenticated, conversations, currentUserId])
+// 주기적으로 대화 목록 갱신하는 useEffect 추가
+useEffect(() => {
+  if (!socket || !isAuthenticated) return;
+
+  const interval = setInterval(() => {
+    console.log('[⏱] Polling for updated conversations...');
+    socket.emit('get_conversations'); // 대화 목록 재요청
+  }, 5000); // 5초 간격으로 갱신
+
+  return () => clearInterval(interval);
+}, [socket, isAuthenticated]);
+
+// 주기적으로 사용자 목록 갱신하는 useEffect 추가 (모달이 열려있을 때만)
+useEffect(() => {
+  if (!socket || !isAuthenticated || !showNewChatModal) return;
+
+  const interval = setInterval(() => {
+    console.log('[⏱] Polling for updated users list...');
+    fetchAllUsers(); // 사용자 목록 재요청
+  }, 1000); // 10초 간격으로 갱신
+
+  return () => clearInterval(interval);
+}, [socket, isAuthenticated, showNewChatModal, fetchAllUsers]);
 
   // 새 대화 모달 열기
   const openNewChatModal = () => {
@@ -411,6 +434,7 @@ export default function MessagesPage() {
     setShowNewChatModal(true)
     setSearchQuery('')
     fetchAllUsers()
+    
   }
 
   // 대화방으로 이동
@@ -445,7 +469,7 @@ export default function MessagesPage() {
     if (socket && isAuthenticated) {
       console.log('Emitting join_room for new chat with userId:', trimmedUserId)
       socket.emit('join_room', trimmedUserId)
-      
+        
       setTimeout(() => {
         console.log('Requesting updated conversations list')
         socket.emit('get_conversations')
