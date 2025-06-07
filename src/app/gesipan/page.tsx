@@ -40,57 +40,57 @@ export default function Home() {
         <Head>
           <title>SecureBoard - 암호화 게시판 시스템</title>
           <meta
-            name='viewport'
-            content='width=device-width, initial-scale=1.0'
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
           />
         </Head>
 
-        <div className='container'>
+        <div className="container">
           <header>
-            <div className='logo'>CryptoCommunity</div>
+            <div className="logo">CryptoCommunity</div>
             <nav>
               <ul>
                 <li>
-                  <Link href='/gesipan'>홈</Link>
+                  <Link href="/gesipan">홈</Link>
                 </li>
                 <li>
-                  <Link href='/members'>소개</Link>
+                  <Link href="/members">소개</Link>
                 </li>
                 <li>
-                  <Link href='/members'>팀원</Link>
+                  <Link href="/members">팀원</Link>
                 </li>
                 <li>
-                  <Link href='/gesipan/new'>작성</Link>
+                  <Link href="/gesipan/new">작성</Link>
                 </li>
               </ul>
             </nav>
           </header>
 
-          <div className='post-list'>
+          <div className="post-list">
             {posts.map((post: any) => (
-              <div className='post-card' key={post._id}>
-                <div className='post-title'>{post.title}</div>
-                <div className='post-info'>
-                  <span>작성자: {post.users || '익명'}</span>
+              <div className="post-card" key={post._id}>
+                <div className="post-title">{post.title}</div>
+                <div className="post-info">
+                  <span>작성자: {post.writer || '익명'}</span>
                   <span>{new Date(post.createdAt).toLocaleDateString()}</span>
                 </div>
-                <div className='post-excerpt'>
+                <div className="post-excerpt">
                   {post.content?.slice(0, 40) || ''}...
                 </div>
-                <div className='encryption-tag'>AES-256</div>
+                <div className="encryption-tag">AES-256</div>
               </div>
             ))}
           </div>
 
-          <div className='pagination'>
+          <div className="pagination">
             <button>이전</button>
-            <button className='active'>1</button>
+            <button className="active">1</button>
             <button>2</button>
             <button>3</button>
             <button>다음</button>
           </div>
 
-          <div className='create-post' title='게시글 작성'>
+          <div className="create-post" title="게시글 작성">
             +
           </div>
 
