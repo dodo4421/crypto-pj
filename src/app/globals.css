@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 :root {
-  --background: #ffffff;
+  --background: #f8f9fa; /* ← 여기서 색상 통일 */
   --foreground: #171717;
 }
 
@@ -12,6 +12,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* 글로벌 스타일 */
 body {
   background: var(--background);
   color: var(--foreground);
