@@ -30,7 +30,7 @@ export default async function handler(
   if (req.method === 'GET') {
     try {
       const post = await db.collection('gesipan').findOne({
-        _id: new ObjectId(id)
+        _id: new ObjectId(id),
       })
 
       if (!post) {
@@ -53,7 +53,9 @@ export default async function handler(
   let decoded: { userId: string; email: string }
 
   try {
-    const publicKey = fs.readFileSync(path.resolve('public.pem'), 'utf8')
+    const publicKey = process.env.PUBLIC_KEY
+      ? process.env.PUBLIC_KEY.replace(/\\n/g, '\n')
+      : fs.readFileSync(path.resolve('public.pem'), 'utf8')
     decoded = jwt.verify(token, publicKey, {
       algorithms: ['RS256'],
     }) as { userId: string; email: string }
@@ -64,7 +66,7 @@ export default async function handler(
 
   // 게시글 존재 여부 및 작성자 확인
   const existingPost = await db.collection('gesipan').findOne({
-    _id: new ObjectId(id)
+    _id: new ObjectId(id),
   })
 
   if (!existingPost) {
@@ -72,7 +74,9 @@ export default async function handler(
   }
 
   if (existingPost.writer !== decoded.userId) {
-    return res.status(403).json({ message: '게시글을 수정/삭제할 권한이 없습니다.' })
+    return res
+      .status(403)
+      .json({ message: '게시글을 수정/삭제할 권한이 없습니다.' })
   }
 
   // PUT 요청 - 게시글 수정
@@ -91,7 +95,7 @@ export default async function handler(
             title,
             content,
             updatedAt: new Date(),
-          }
+          },
         }
       )
 
@@ -101,12 +105,12 @@ export default async function handler(
 
       // 수정된 게시글 반환
       const updatedPost = await db.collection('gesipan').findOne({
-        _id: new ObjectId(id)
+        _id: new ObjectId(id),
       })
 
       return res.status(200).json({
         message: '게시글이 수정되었습니다.',
-        ...updatedPost
+        ...updatedPost,
       })
     } catch (err) {
       console.error('게시글 수정 실패:', err)
@@ -118,7 +122,7 @@ export default async function handler(
   if (req.method === 'DELETE') {
     try {
       const result = await db.collection('gesipan').deleteOne({
-        _id: new ObjectId(id)
+        _id: new ObjectId(id),
       })
 
       if (result.deletedCount === 0) {
@@ -127,7 +131,7 @@ export default async function handler(
 
       return res.status(200).json({
         message: '게시글이 삭제되었습니다.',
-        deletedId: id
+        deletedId: id,
       })
     } catch (err) {
       console.error('게시글 삭제 실패:', err)

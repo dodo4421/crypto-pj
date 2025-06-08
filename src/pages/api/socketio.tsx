@@ -18,7 +18,9 @@ interface CustomJwtPayload extends JwtPayload {
 // JWT 검증 함수 수정
 const verifyToken = (token: string): CustomJwtPayload | null => {
   try {
-    const publicKey = fs.readFileSync(path.resolve('public.pem'), 'utf8')
+    const publicKey = process.env.PUBLIC_KEY
+      ? process.env.PUBLIC_KEY.replace(/\\n/g, '\n')
+      : fs.readFileSync(path.resolve('public.pem'), 'utf8')
     return jwt.verify(token, publicKey, {
       algorithms: ['RS256'],
     }) as CustomJwtPayload

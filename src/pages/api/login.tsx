@@ -24,7 +24,9 @@ export default async function handler(
   if (!passwordMatch)
     return res.status(401).json({ message: '이메일 또는 비밀번호가 틀립니다.' })
 
-  const privateKey = fs.readFileSync(path.resolve('private.pem'), 'utf8')
+  const privateKey = process.env.PRIVATE_KEY
+    ? process.env.PRIVATE_KEY.replace(/\\n/g, '\n')
+    : fs.readFileSync(path.resolve('private.pem'), 'utf8')
   const accessToken = jwt.sign(
     {
       email: user.email,

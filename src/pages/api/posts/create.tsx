@@ -22,7 +22,9 @@ export default async function handler(
   let decoded: { userId: string; email: string }
 
   try {
-    const publicKey = fs.readFileSync(path.resolve('public.pem'), 'utf8')
+    const publicKey = process.env.PUBLIC_KEY
+      ? process.env.PUBLIC_KEY.replace(/\\n/g, '\n')
+      : fs.readFileSync(path.resolve('public.pem'), 'utf8')
     decoded = jwt.verify(token, publicKey, {
       algorithms: ['RS256'],
     }) as { userId: string; email: string }
