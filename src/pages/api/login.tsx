@@ -1,10 +1,7 @@
-// ✅ [1] 로그인 API: pages/api/login.ts
 import { NextApiRequest, NextApiResponse } from 'next'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import clientPromise from '../../../lib/mongodb'
-import fs from 'fs'
-import path from 'path'
 
 export default async function handler(
   req: NextApiRequest,
@@ -24,9 +21,16 @@ export default async function handler(
   if (!passwordMatch)
     return res.status(401).json({ message: '이메일 또는 비밀번호가 틀립니다.' })
 
-  const privateKey = process.env.PRIVATE_KEY
-    ? process.env.PRIVATE_KEY.replace(/\\n/g, '\n')
-    : fs.readFileSync(path.resolve('private.pem'), 'utf8')
+  let privateKey = process.env.PRIVATE_KEY
+
+  if (privateKey) {
+    privateKey = privateKey.replace(/\\n/g, '\n')
+  } else {
+    const fs = require('fs')
+    const path = require('path')
+    privateKey = fs.readFileSync(path.resolve('private.pem'), 'utf8')
+  }
+
   const accessToken = jwt.sign(
     {
       email: user.email,
