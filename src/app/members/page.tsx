@@ -1,29 +1,33 @@
 import React from 'react'
 import Link from 'next/link'
 import { FaGithub } from 'react-icons/fa' // GitHub 아이콘
+import AuthGuard from '@/components/AuthGuard'
 
 const members = [
   {
     name: '이태연',
-    info: '정보보호학과 20학번',
-    role: 'AI개발, 프론트엔드',
+    info: '정보보호학전공 20학번',
+    role: '프론트엔드',
+    eole: 'JWT-RS 인증 백엔드',
     github: 'https://github.com/leetaeyeon11111',
     githubId: 'leetaeyeon11111',
   },
   {
     name: '장재원',
     info: '정보보호학과 20학번',
-    role: 'AI개발, 프론트엔드',
+    role: '프론트엔드',
+    eole: '게시판 기능 백엔드',
     github: 'https://github.com/dodo4421',
     githubId: 'dodo4421',
   },
   {
     name: '서우석',
     info: '정보보호학과 20학번',
-    role: 'AI개발, 프론트엔드',
+    role: '프론트엔드',
+    eole: '실시간 채팅 백엔드',
     github: 'https://github.com/wooseok0301',
     githubId: 'wooseok0301',
-  }
+  },
 ]
 
 const pageContainerStyle: React.CSSProperties = {
@@ -151,68 +155,76 @@ const linkStyle: React.CSSProperties = {
 
 export default function Members() {
   return (
-    <div style={pageContainerStyle}>
-      {/* Header */}
-      <header style={headerStyle}>
-        <div style={headerContainerStyle}>
-          <div style={logoContainerStyle}>
-            <div style={logoStyle}>
-              🔐
+    <AuthGuard>
+      <div style={pageContainerStyle}>
+        {/* Header */}
+        <header style={headerStyle}>
+          <div style={headerContainerStyle}>
+            <div style={logoContainerStyle}>
+              <div style={logoStyle}>🔐</div>
+              <div style={logoTextStyle}>CryptoCommunity</div>
             </div>
-            <div style={logoTextStyle}>
-              CryptoCommunity
-            </div>
+            <nav>
+              <ul style={navStyle}>
+                <li>
+                  <Link href="/gesipan" style={navLinkStyle}>
+                    홈
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/inform" style={navLinkStyle}>
+                    소개
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/members"
+                    style={{ ...navLinkStyle, ...activeLinkStyle }}
+                  >
+                    팀원
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/messages" style={navLinkStyle}>
+                    대화
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/gesipan/new">작성</Link>
+                </li>
+              </ul>
+            </nav>
           </div>
-          <nav>
-            <ul style={navStyle}>
-              <li>
-                <Link href="/gesipan" style={navLinkStyle}>홈</Link>
-              </li>
-              <li>
-                <Link href="/inform" style={navLinkStyle}>소개</Link>
-              </li>
-              <li>
-                <Link href="/members" style={{...navLinkStyle, ...activeLinkStyle}}>팀원</Link>
-              </li>
-              <li>
-                <Link href="/messages" style={navLinkStyle}>대화</Link>
-              </li>
-              <li>
-                <Link href="/gesipan/new">
-                  작성
-                </Link>
-              </li>
-            </ul>
-          </nav>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <div style={wrapperStyle}>
-        <h2 style={titleStyle}>팀원 소개</h2>
-        <div style={containerStyle}>
-          {members.map((member, index) => (
-            <div key={index} style={cardStyle}>
-              <img
-                src={`https://github.com/${member.githubId}.png`}
-                alt={`${member.name} 프로필`}
-                style={profileImageStyle}
-              />
-              <h3>{member.name}</h3>
-              <p>{member.info}</p>
-              <p>{member.role}</p>
-              <a
-                href={member.github}
-                target='_blank'
-                rel='noopener noreferrer'
-                style={linkStyle}
-              >
-                <FaGithub size={24} />
-              </a>
-            </div>
-          ))}
+        {/* Main Content */}
+        <div style={wrapperStyle}>
+          <h2 style={titleStyle}>팀원 소개</h2>
+          <div style={containerStyle}>
+            {members.map((member, index) => (
+              <div key={index} style={cardStyle}>
+                <img
+                  src={`https://github.com/${member.githubId}.png`}
+                  alt={`${member.name} 프로필`}
+                  style={profileImageStyle}
+                />
+                <h3>{member.name}</h3>
+                <p>{member.info}</p>
+                <p>{member.role}</p>
+                <p>{member.eole}</p>
+                <a
+                  href={member.github}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={linkStyle}
+                >
+                  <FaGithub size={24} />
+                </a>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </AuthGuard>
   )
 }
