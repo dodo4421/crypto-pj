@@ -39,21 +39,29 @@ export default function NewPostPage() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Navbar */}
-      <header className="w-full border-b border-gray-200">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="text-2xl font-bold text-gray-800">
-            CryptoCommunity
-          </div>
+        <header className="w-full border-b border-gray-200">
+          <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+                🔐
+              </div>
+              <div className="text-2xl font-bold text-gray-800">
+                CryptoCommunity
+              </div>
+            </div>
           <nav>
             <ul className="flex gap-6 text-gray-700 text-m">
               <li>
                 <Link href="/gesipan">홈</Link>
               </li>
               <li>
-                <Link href="/members">소개</Link>
+                <Link href="/inform">소개</Link>
               </li>
               <li>
                 <Link href="/members">팀원</Link>
+              </li>
+              <li>
+                <Link href="/messages">대화</Link>
               </li>
               <li>
                 <Link
@@ -62,9 +70,6 @@ export default function NewPostPage() {
                 >
                   작성
                 </Link>
-              </li>
-              <li>
-                <Link href="/messages">대화</Link>
               </li>
             </ul>
           </nav>
