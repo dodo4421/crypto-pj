@@ -52,17 +52,17 @@ export default function PostDetailPage() {
     const initializeSocket = async () => {
       try {
         console.log('Initializing Socket.io server for chat...')
-        
+
         // Socket.io 서버 초기화
         await fetch('/api/socketio')
-        
+
         // 약간의 지연 후 클라이언트 연결
         setTimeout(() => {
           console.log('Creating socket connection...')
-          
+
           const newSocket = io(
-            process.env.NODE_ENV === 'production' 
-              ? window.location.origin 
+            process.env.NODE_ENV === 'production'
+              ? window.location.origin
               : 'http://localhost:3000',
             {
               path: '/api/socketio',
@@ -91,46 +91,50 @@ export default function PostDetailPage() {
           // 대화 목록 수신
           newSocket.on('conversations_list', (conversationsList: any[]) => {
             console.log('Conversations received:', conversationsList)
-            
+
             if (!conversationsList || conversationsList.length === 0) {
               setConversations([])
               return
             }
-            
+
             // 데이터 구조 정규화
             const normalizedConversations = conversationsList
-              .filter(conv => conv && conv.participant)
+              .filter((conv) => conv && conv.participant)
               .map((conv, index) => {
-                const roomId = conv.id || conv.roomId || conv._id || `conv-${index}-${Date.now()}`
-                
+                const roomId =
+                  conv.id ||
+                  conv.roomId ||
+                  conv._id ||
+                  `conv-${index}-${Date.now()}`
+
                 return {
                   id: roomId,
                   participant: {
                     id: conv.participant?.id || conv.participant?._id,
                     email: conv.participant?.email || '',
                     nickname: conv.participant?.nickname,
-                    online: conv.participant?.online || false
+                    online: conv.participant?.online || false,
                   },
                   lastMessage: conv.lastMessage,
                   unreadCount: conv.unreadCount || 0,
-                  updatedAt: conv.updatedAt || new Date().toISOString()
+                  updatedAt: conv.updatedAt || new Date().toISOString(),
                 }
               })
-              .filter(conv => conv.participant.id)
-            
+              .filter((conv) => conv.participant.id)
+
             setConversations(normalizedConversations)
           })
 
           // 새 대화방 생성 이벤트 처리
           newSocket.on('conversation_created', (newConversation) => {
             console.log('New conversation created:', newConversation)
-            setConversations(prev => [newConversation, ...prev])
+            setConversations((prev) => [newConversation, ...prev])
           })
 
           // 채팅 기록 받기 (새 대화방 입장 시)
           newSocket.on('chat_history', (data) => {
             console.log('Chat history received:', data)
-            
+
             if (data.messages.length === 0 && data.recipientInfo) {
               const newConversation: Conversation = {
                 id: data.roomId,
@@ -138,27 +142,28 @@ export default function PostDetailPage() {
                   id: data.recipientInfo.id,
                   email: data.recipientInfo.email,
                   nickname: data.recipientInfo.nickname,
-                  online: false
+                  online: false,
                 },
                 lastMessage: null,
                 unreadCount: 0,
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
               }
-              
-              setConversations(prev => {
-                const exists = prev.some(conv => 
-                  conv.id === newConversation.id || 
-                  conv.participant.id === newConversation.participant.id
+
+              setConversations((prev) => {
+                const exists = prev.some(
+                  (conv) =>
+                    conv.id === newConversation.id ||
+                    conv.participant.id === newConversation.participant.id
                 )
-                
+
                 if (!exists) {
                   return [newConversation, ...prev]
                 }
-                
+
                 return prev
               })
             }
-            
+
             // 채팅 페이지로 이동
             setIsConnecting(false)
             router.push(`/chat/${data.recipientInfo.id}`)
@@ -166,7 +171,6 @@ export default function PostDetailPage() {
 
           setSocket(newSocket)
         }, 1000)
-        
       } catch (error) {
         console.error('Socket initialization error:', error)
         setIsConnecting(false)
@@ -216,8 +220,8 @@ export default function PostDetailPage() {
     setIsConnecting(true)
 
     // 기존 대화방이 있는지 확인
-    const existingConversation = conversations.find(conv => 
-      conv.participant.id === post.writer
+    const existingConversation = conversations.find(
+      (conv) => conv.participant.id === post.writer
     )
 
     if (existingConversation) {
@@ -229,7 +233,7 @@ export default function PostDetailPage() {
       // 새 대화방 생성
       console.log('새 대화방 생성 요청:', post.writer)
       socket.emit('join_room', post.writer)
-      
+
       // 타임아웃 설정 (10초 후에도 응답이 없으면 연결 해제)
       setTimeout(() => {
         if (isConnecting) {
@@ -252,7 +256,7 @@ export default function PostDetailPage() {
         <span>{new Date(post.createdAt).toLocaleDateString()}</span>
       </div>
       <span className="inline-block mb-4 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-        AES-256
+        JWT-RS 인증
       </span>
       <p className="text-gray-700 whitespace-pre-line">{post.content}</p>
 

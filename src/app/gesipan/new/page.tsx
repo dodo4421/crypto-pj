@@ -63,6 +63,9 @@ export default function NewPostPage() {
                   작성
                 </Link>
               </li>
+              <li>
+                <Link href="/messages">대화</Link>
+              </li>
             </ul>
           </nav>
         </div>

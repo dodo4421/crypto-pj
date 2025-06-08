@@ -8,8 +8,10 @@ import AuthGuard from '@/components/AuthGuard'
 
 export default function GesipanHome() {
   const router = useRouter()
-  const [posts, setPosts] = useState([])
+  const [posts, setPosts] = useState<any[]>([])
+  const [originalPosts, setOriginalPosts] = useState<any[]>([]) // 원본 저장용
   const [currentPage, setCurrentPage] = useState(1)
+  const [search, setSearch] = useState('')
   const postsPerPage = 6
 
   useEffect(() => {
@@ -24,6 +26,7 @@ export default function GesipanHome() {
         const res = await fetch('/api/gesipan/')
         const data = await res.json()
         setPosts(data)
+        setOriginalPosts(data)
       } catch (err) {
         console.error('게시글 로딩 실패:', err)
       }
@@ -31,6 +34,24 @@ export default function GesipanHome() {
     fetchPosts()
   }, [])
 
+  // 검색 처리
+  const handleSearch = (value: string) => {
+    setSearch(value)
+    const keyword = value.toLowerCase()
+    if (!keyword) {
+      setPosts(originalPosts)
+    } else {
+      const filtered = originalPosts.filter(
+        (post) =>
+          post.title.toLowerCase().includes(keyword) ||
+          post.content.toLowerCase().includes(keyword)
+      )
+      setPosts(filtered)
+      setCurrentPage(1)
+    }
+  }
+
+  // 페이지 계산
   const indexOfLastPost = currentPage * postsPerPage
   const indexOfFirstPost = indexOfLastPost - postsPerPage
   const currentPosts = posts.slice(indexOfFirstPost, indexOfLastPost)
@@ -79,33 +100,66 @@ export default function GesipanHome() {
                   <li>
                     <Link href="/gesipan/new">작성</Link>
                   </li>
+                  <li>
+                    <Link href="/messages">대화</Link>
+                  </li>
                 </ul>
               </nav>
             </div>
           </header>
 
+          <div className="w-full border-b border-gray-200 py-10 relative">
+            <div className="container mx-auto px-4">
+              {/* 검색창을 절대 가운데 */}
+              <div className="absolute left-1/2 transform -translate-x-1/2 top-1/2 -translate-y-1/2">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="게시글 제목 또는 내용을 검색하세요"
+                  className="w-[700px] px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* 우측 텍스트 */}
+              <div className="text-sm text-gray-400 text-right">
+                2025 - 암호 프로그래밍 01분반
+              </div>
+            </div>
+          </div>
+
           {/* Main */}
-          <main className="flex-grow container mx-auto px-4 py-10">
+          <main className="flex-grow container mx-auto px-4 py-20">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {currentPosts.map((post: any) => (
+              {currentPosts.map((post) => (
                 <Link
                   key={post._id}
                   href={`/gesipan/${post._id}`}
-                  className="block bg-white rounded-lg shadow-md p-5 hover:shadow-lg transition"
+                  className="flex flex-col justify-between bg-gray-50 rounded-lg shadow-md p-6 hover:shadow-lg transition min-h-[260px]"
                 >
-                  <div className="text-lg font-semibold text-gray-800 mb-1">
-                    {post.title}
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-500 mb-2">
-                    <span>작성자: {post.writer || '익명'}</span>
-                    <span>{new Date(post.createdAt).toLocaleDateString()}</span>
-                  </div>
-                  <p className="text-gray-600 line-clamp-2">
-                    {post.content?.slice(0, 40)}...
-                  </p>
+                  <div className="flex flex-col gap-3">
+                    {/* 제목 */}
+                    <h2 className="text-lg font-semibold text-gray-800">
+                      {post.title}
+                    </h2>
 
-                  <span className="inline-block mt-3 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                    AES-256
+                    {/* 작성자 + 날짜: 아래로 살짝 내리기 */}
+                    <div className="flex justify-between text-sm text-gray-500 mt-1">
+                      <span>작성자: {post.writer || '익명'}</span>
+                      <span>
+                        {new Date(post.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    {/* 내용: 중간 정도에 위치한 느낌 주기 */}
+                    <p className="text-gray-600 line-clamp-3 mt-6 mb-2">
+                      {post.content?.slice(0, 80)}...
+                    </p>
+                  </div>
+
+                  {/* 알고리즘 태그 */}
+                  <span className="inline-block text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded self-start">
+                    JWT-RS 인증
                   </span>
                 </Link>
               ))}
