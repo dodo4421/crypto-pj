@@ -136,7 +136,7 @@ export default function MessagesPage() {
 
           const newSocket = io(
             process.env.NODE_ENV === 'production'
-              ? 'https://crypto-pj.vercel.app' // 배포 주소
+              ? 'https://crypto-pj.onrender.com' // 배포 주소
               : 'http://localhost:3000', // 개발 주소
             {
               path: '/api/socketio',
