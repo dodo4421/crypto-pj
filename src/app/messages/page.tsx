@@ -136,8 +136,8 @@ export default function MessagesPage() {
 
           const newSocket = io(
             process.env.NODE_ENV === 'production'
-              ? window.location.origin
-              : 'https://crypto-pj.vercel.app/',
+              ? 'https://crypto-pj.vercel.app' // 배포 주소
+              : 'http://localhost:3000', // 개발 주소
             {
               path: '/api/socketio',
               transports: ['polling', 'websocket'], // polling을 먼저 시도
