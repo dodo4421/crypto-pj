@@ -140,7 +140,7 @@ export default function GesipanHome() {
                 <Link
                   key={post._id}
                   href={`/gesipan/${post._id}`}
-                  className="flex flex-col justify-between bg-gray-50 rounded-lg shadow-md p-6 hover:shadow-lg transition min-h-[260px]"
+                  className="flex flex-col justify-between bg-gray-100 rounded-lg shadow-md p-6 hover:shadow-lg transition min-h-[260px]"
                 >
                   <div className="flex flex-col gap-3">
                     {/* 제목 */}
